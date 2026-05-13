@@ -62,11 +62,14 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   }
 
   if (data.user && data.session) {
+    const ADMIN_EMAIL = 'himanshu003388@gmail.com'; // Change this to your actual admin email
+    const role = email.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user';
+
     const { error: profileError } = await supabase.from('profiles').upsert({
       id: data.user.id,
       username: username.toLowerCase(),
       email: email.toLowerCase(),
-      role: 'user',
+      role: role,
     }, { onConflict: 'id' });
 
     if (profileError) {

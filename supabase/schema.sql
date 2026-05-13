@@ -16,8 +16,11 @@ CREATE TABLE public.messages (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   chat_id UUID,
   sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  content TEXT NOT NULL,
+  receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE, -- Nullable for general chat
+  content TEXT, -- Nullable because message might only be a file
+  file_url TEXT,
+  file_name TEXT,
+  file_type TEXT,
   is_read BOOLEAN DEFAULT false NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -49,9 +52,9 @@ CREATE POLICY "Users can insert their own messages."
   ON public.messages FOR INSERT
   WITH CHECK ( auth.uid() = sender_id );
 
-CREATE POLICY "Users can view messages they sent or received."
+CREATE POLICY "Users can view messages they sent or received or general messages."
   ON public.messages FOR SELECT
-  USING ( auth.uid() = sender_id OR auth.uid() = receiver_id );
+  USING ( auth.uid() = sender_id OR auth.uid() = receiver_id OR receiver_id IS NULL );
 
 CREATE POLICY "Users can update their received messages (to mark as read)."
   ON public.messages FOR UPDATE
@@ -63,6 +66,10 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
 
 -- Create Storage bucket for avatars
 INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Create Storage bucket for chat attachments
+INSERT INTO storage.buckets (id, name, public) VALUES ('chat-attachments', 'chat-attachments', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage Policies
@@ -77,6 +84,14 @@ CREATE POLICY "Anyone can upload an avatar."
 CREATE POLICY "Anyone can update their avatar."
   ON storage.objects FOR UPDATE
   USING ( bucket_id = 'avatars' );
+
+CREATE POLICY "Chat attachments are publicly accessible."
+  ON storage.objects FOR SELECT
+  USING ( bucket_id = 'chat-attachments' );
+
+CREATE POLICY "Authenticated users can upload chat attachments."
+  ON storage.objects FOR INSERT
+  WITH CHECK ( bucket_id = 'chat-attachments' AND auth.role() = 'authenticated' );
 
 -- Function to handle new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
