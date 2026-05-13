@@ -4,9 +4,11 @@ import 'clsx';
 import { createServerClient } from '@supabase/ssr';
 
 const supabaseClient = (context) => {
+  const supabaseUrl = "https://yobdetdziljwrlnqanxm.supabase.co";
+  const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvYmRldGR6aWxqd3JsbnFhbnhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MDc3ODQsImV4cCI6MjA5NDE4Mzc4NH0.vVZl2vhkgXdh9RXJ6ayExyBSsBYz-yHuAprZP8oWe5o";
   return createServerClient(
-    "https://yobdetdziljwrlnqanxm.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvYmRldGR6aWxqd3JsbnFhbnhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MDc3ODQsImV4cCI6MjA5NDE4Mzc4NH0.vVZl2vhkgXdh9RXJ6ayExyBSsBYz-yHuAprZP8oWe5o",
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {

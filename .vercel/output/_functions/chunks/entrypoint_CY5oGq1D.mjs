@@ -2,12 +2,12 @@ import '@vercel/routing-utils';
 import nodePath from 'node:path';
 import colors from 'piccolore';
 import { p as pipelineSymbol, s as shouldAppendForwardSlash, r as removeTrailingForwardSlash, A as ActionNotFoundError, R as REDIRECT_STATUS_CODES, a as AstroError, b as ActionsReturnedInvalidDataError, c as ResponseSentError, d as defineMiddleware, N as NOOP_MIDDLEWARE_HEADER, E as EndpointDidNotReturnAResponse, e as REROUTABLE_STATUS_CODES, f as REROUTE_DIRECTIVE_HEADER, i as isPropagatingHint, g as getPropagationHint$1, M as MissingMediaQueryDirective, h as NoMatchingImport, j as escapeHTML, k as bufferPropagatedHead, l as isHeadAndContent, m as isRenderTemplateResult, O as OnlyResponseCanBeReturned, n as isPromise, o as promiseWithResolvers, q as encoder, t as chunkToByteArray, u as chunkToString, v as chunkToByteArrayOrString, w as toAttributeString, x as markHTMLString, y as renderSlotToString, z as maybeRenderHead, B as containsServerDirective, F as Fragment, C as renderSlot, D as renderSlots, S as ServerIslandComponent, G as createAstroComponentInstance, H as Renderer, I as NoMatchingRenderer, J as formatList, K as NoClientOnlyHint, L as internalSpreadAttributes, P as voidElementNames, Q as renderTemplate, T as createRenderInstruction, U as renderElement$1, V as SlotString, W as mergeSlotInstructions, X as HTMLString, Y as isHTMLString, Z as isRenderInstruction, _ as isAstroComponentInstance, $ as isRenderInstance, a0 as renderCspContent, a1 as isNode, a2 as isDeno, a3 as addAttribute, a4 as decryptString, a5 as createSlotValueFromString, a6 as DEFAULT_404_COMPONENT, a7 as DEFAULT_404_ROUTE, a8 as default404Instance, a9 as getParams, aa as prependForwardSlash, ab as decodeKey, ac as UnableToLoadLogger, ad as RouteCache, ae as sequence, af as ReservedSlotName, ag as ROUTE_TYPE_HEADER, ah as appendForwardSlash, ai as i18nNoLocaleFoundInPath, aj as MiddlewareNoDataOrNextCalled, ak as MiddlewareNotAResponse, al as CacheNotEnabled, am as ASTRO_ERROR_HEADER, an as REWRITE_DIRECTIVE_HEADER_KEY, ao as REWRITE_DIRECTIVE_HEADER_VALUE, ap as collapseDuplicateSlashes, aq as ForbiddenRewrite, ar as copyRequest, as as setOriginPathname, at as isRoute404, au as isRoute500, av as originPathnameSymbol, aw as generateCspDigest, ax as ASTRO_GENERATOR, ay as PrerenderClientAddressNotAvailable, az as ClientAddressNotAvailable, aA as StaticClientAddressNotAvailable, aB as routeHasHtmlExtension, aC as collapseDuplicateLeadingSlashes, aD as getProps, aE as fetchStateSymbol, aF as AstroResponseHeadersReassigned, aG as responseSentSymbol$1, aH as getOriginPathname, aI as LocalsReassigned, aJ as INTERNAL_RESPONSE_HEADERS, aK as isInternalPath, aL as collapseDuplicateTrailingSlashes, aM as hasFileExtension, aN as removeLeadingForwardSlash, aO as getRouteGenerator, aP as SessionStorageInitError, aQ as SessionStorageSaveError, aR as appSymbol, aS as joinPaths, aT as LocalsNotAnObject, aU as clientAddressSymbol, aV as fileExtension, aW as slash, aX as routeIsRedirect, aY as routeIsFallback, aZ as getFallbackRoute, a_ as findRouteToRewrite } from './params-and-props_Bdc0UXF-.mjs';
-import { parse, stringify as stringify$1, unflatten as unflatten$1 } from 'devalue';
+import { parse, stringify as stringify$2, unflatten as unflatten$1 } from 'devalue';
 import 'es-module-lexer';
 import { serialize, parse as parse$1 } from 'cookie';
 import { clsx } from 'clsx';
 import { escape } from 'html-escaper';
-import { createStorage } from 'unstorage';
+import destr from 'destr';
 import React, { createElement } from 'react';
 import ReactDOM from 'react-dom/server';
 
@@ -1010,7 +1010,7 @@ const ASTRO_PATH_PARAM = "x_astro_path";
 const ASTRO_LOCALS_HEADER = "x-astro-locals";
 const ASTRO_MIDDLEWARE_SECRET_HEADER = "x-astro-middleware-secret";
 
-const middlewareSecret = "141fa55c-5d28-4947-8942-bce78fb8505b";
+const middlewareSecret = "116f5388-a657-4700-82a3-190c7512cc75";
 
 const ACTION_QUERY_PARAMS = {
   actionName: "_action"};
@@ -1371,7 +1371,7 @@ function serializeActionResult(res) {
   }
   let body;
   try {
-    body = stringify$1(res.data, {
+    body = stringify$2(res.data, {
       // Add support for URL objects
       URL: (value) => value instanceof URL && value.href
     });
@@ -6791,6 +6791,543 @@ async function renderRedirect(state) {
   return new Response(null, { status, headers });
 }
 
+function wrapToPromise(value) {
+  if (!value || typeof value.then !== "function") {
+    return Promise.resolve(value);
+  }
+  return value;
+}
+function asyncCall(function_, ...arguments_) {
+  try {
+    return wrapToPromise(function_(...arguments_));
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+function isPrimitive(value) {
+  const type = typeof value;
+  return value === null || type !== "object" && type !== "function";
+}
+function isPureObject(value) {
+  const proto = Object.getPrototypeOf(value);
+  return !proto || proto.isPrototypeOf(Object);
+}
+function stringify$1(value) {
+  if (isPrimitive(value)) {
+    return String(value);
+  }
+  if (isPureObject(value) || Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+  if (typeof value.toJSON === "function") {
+    return stringify$1(value.toJSON());
+  }
+  throw new Error("[unstorage] Cannot stringify value!");
+}
+const BASE64_PREFIX = "base64:";
+function serializeRaw(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  return BASE64_PREFIX + base64Encode(value);
+}
+function deserializeRaw(value) {
+  if (typeof value !== "string") {
+    return value;
+  }
+  if (!value.startsWith(BASE64_PREFIX)) {
+    return value;
+  }
+  return base64Decode(value.slice(BASE64_PREFIX.length));
+}
+function base64Decode(input) {
+  if (globalThis.Buffer) {
+    return Buffer.from(input, "base64");
+  }
+  return Uint8Array.from(
+    globalThis.atob(input),
+    (c) => c.codePointAt(0)
+  );
+}
+function base64Encode(input) {
+  if (globalThis.Buffer) {
+    return Buffer.from(input).toString("base64");
+  }
+  return globalThis.btoa(String.fromCodePoint(...input));
+}
+function normalizeKey(key) {
+  if (!key) {
+    return "";
+  }
+  return key.split("?")[0]?.replace(/[/\\]/g, ":").replace(/:+/g, ":").replace(/^:|:$/g, "") || "";
+}
+function joinKeys(...keys) {
+  return normalizeKey(keys.join(":"));
+}
+function normalizeBaseKey(base) {
+  base = normalizeKey(base);
+  return base ? base + ":" : "";
+}
+function filterKeyByDepth(key, depth) {
+  if (depth === void 0) {
+    return true;
+  }
+  let substrCount = 0;
+  let index = key.indexOf(":");
+  while (index > -1) {
+    substrCount++;
+    index = key.indexOf(":", index + 1);
+  }
+  return substrCount <= depth;
+}
+function filterKeyByBase(key, base) {
+  if (base) {
+    return key.startsWith(base) && key[key.length - 1] !== "$";
+  }
+  return key[key.length - 1] !== "$";
+}
+
+function defineDriver(factory) {
+  return factory;
+}
+
+const DRIVER_NAME = "memory";
+const memory = defineDriver(() => {
+  const data = /* @__PURE__ */ new Map();
+  return {
+    name: DRIVER_NAME,
+    getInstance: () => data,
+    hasItem(key) {
+      return data.has(key);
+    },
+    getItem(key) {
+      return data.get(key) ?? null;
+    },
+    getItemRaw(key) {
+      return data.get(key) ?? null;
+    },
+    setItem(key, value) {
+      data.set(key, value);
+    },
+    setItemRaw(key, value) {
+      data.set(key, value);
+    },
+    removeItem(key) {
+      data.delete(key);
+    },
+    getKeys() {
+      return [...data.keys()];
+    },
+    clear() {
+      data.clear();
+    },
+    dispose() {
+      data.clear();
+    }
+  };
+});
+
+function createStorage(options = {}) {
+  const context = {
+    mounts: { "": options.driver || memory() },
+    mountpoints: [""],
+    watching: false,
+    watchListeners: [],
+    unwatch: {}
+  };
+  const getMount = (key) => {
+    for (const base of context.mountpoints) {
+      if (key.startsWith(base)) {
+        return {
+          base,
+          relativeKey: key.slice(base.length),
+          driver: context.mounts[base]
+        };
+      }
+    }
+    return {
+      base: "",
+      relativeKey: key,
+      driver: context.mounts[""]
+    };
+  };
+  const getMounts = (base, includeParent) => {
+    return context.mountpoints.filter(
+      (mountpoint) => mountpoint.startsWith(base) || includeParent && base.startsWith(mountpoint)
+    ).map((mountpoint) => ({
+      relativeBase: base.length > mountpoint.length ? base.slice(mountpoint.length) : void 0,
+      mountpoint,
+      driver: context.mounts[mountpoint]
+    }));
+  };
+  const onChange = (event, key) => {
+    if (!context.watching) {
+      return;
+    }
+    key = normalizeKey(key);
+    for (const listener of context.watchListeners) {
+      listener(event, key);
+    }
+  };
+  const startWatch = async () => {
+    if (context.watching) {
+      return;
+    }
+    context.watching = true;
+    for (const mountpoint in context.mounts) {
+      context.unwatch[mountpoint] = await watch(
+        context.mounts[mountpoint],
+        onChange,
+        mountpoint
+      );
+    }
+  };
+  const stopWatch = async () => {
+    if (!context.watching) {
+      return;
+    }
+    for (const mountpoint in context.unwatch) {
+      await context.unwatch[mountpoint]();
+    }
+    context.unwatch = {};
+    context.watching = false;
+  };
+  const runBatch = (items, commonOptions, cb) => {
+    const batches = /* @__PURE__ */ new Map();
+    const getBatch = (mount) => {
+      let batch = batches.get(mount.base);
+      if (!batch) {
+        batch = {
+          driver: mount.driver,
+          base: mount.base,
+          items: []
+        };
+        batches.set(mount.base, batch);
+      }
+      return batch;
+    };
+    for (const item of items) {
+      const isStringItem = typeof item === "string";
+      const key = normalizeKey(isStringItem ? item : item.key);
+      const value = isStringItem ? void 0 : item.value;
+      const options2 = isStringItem || !item.options ? commonOptions : { ...commonOptions, ...item.options };
+      const mount = getMount(key);
+      getBatch(mount).items.push({
+        key,
+        value,
+        relativeKey: mount.relativeKey,
+        options: options2
+      });
+    }
+    return Promise.all([...batches.values()].map((batch) => cb(batch))).then(
+      (r) => r.flat()
+    );
+  };
+  const storage = {
+    // Item
+    hasItem(key, opts = {}) {
+      key = normalizeKey(key);
+      const { relativeKey, driver } = getMount(key);
+      return asyncCall(driver.hasItem, relativeKey, opts);
+    },
+    getItem(key, opts = {}) {
+      key = normalizeKey(key);
+      const { relativeKey, driver } = getMount(key);
+      return asyncCall(driver.getItem, relativeKey, opts).then(
+        (value) => destr(value)
+      );
+    },
+    getItems(items, commonOptions = {}) {
+      return runBatch(items, commonOptions, (batch) => {
+        if (batch.driver.getItems) {
+          return asyncCall(
+            batch.driver.getItems,
+            batch.items.map((item) => ({
+              key: item.relativeKey,
+              options: item.options
+            })),
+            commonOptions
+          ).then(
+            (r) => r.map((item) => ({
+              key: joinKeys(batch.base, item.key),
+              value: destr(item.value)
+            }))
+          );
+        }
+        return Promise.all(
+          batch.items.map((item) => {
+            return asyncCall(
+              batch.driver.getItem,
+              item.relativeKey,
+              item.options
+            ).then((value) => ({
+              key: item.key,
+              value: destr(value)
+            }));
+          })
+        );
+      });
+    },
+    getItemRaw(key, opts = {}) {
+      key = normalizeKey(key);
+      const { relativeKey, driver } = getMount(key);
+      if (driver.getItemRaw) {
+        return asyncCall(driver.getItemRaw, relativeKey, opts);
+      }
+      return asyncCall(driver.getItem, relativeKey, opts).then(
+        (value) => deserializeRaw(value)
+      );
+    },
+    async setItem(key, value, opts = {}) {
+      if (value === void 0) {
+        return storage.removeItem(key);
+      }
+      key = normalizeKey(key);
+      const { relativeKey, driver } = getMount(key);
+      if (!driver.setItem) {
+        return;
+      }
+      await asyncCall(driver.setItem, relativeKey, stringify$1(value), opts);
+      if (!driver.watch) {
+        onChange("update", key);
+      }
+    },
+    async setItems(items, commonOptions) {
+      await runBatch(items, commonOptions, async (batch) => {
+        if (batch.driver.setItems) {
+          return asyncCall(
+            batch.driver.setItems,
+            batch.items.map((item) => ({
+              key: item.relativeKey,
+              value: stringify$1(item.value),
+              options: item.options
+            })),
+            commonOptions
+          );
+        }
+        if (!batch.driver.setItem) {
+          return;
+        }
+        await Promise.all(
+          batch.items.map((item) => {
+            return asyncCall(
+              batch.driver.setItem,
+              item.relativeKey,
+              stringify$1(item.value),
+              item.options
+            );
+          })
+        );
+      });
+    },
+    async setItemRaw(key, value, opts = {}) {
+      if (value === void 0) {
+        return storage.removeItem(key, opts);
+      }
+      key = normalizeKey(key);
+      const { relativeKey, driver } = getMount(key);
+      if (driver.setItemRaw) {
+        await asyncCall(driver.setItemRaw, relativeKey, value, opts);
+      } else if (driver.setItem) {
+        await asyncCall(driver.setItem, relativeKey, serializeRaw(value), opts);
+      } else {
+        return;
+      }
+      if (!driver.watch) {
+        onChange("update", key);
+      }
+    },
+    async removeItem(key, opts = {}) {
+      if (typeof opts === "boolean") {
+        opts = { removeMeta: opts };
+      }
+      key = normalizeKey(key);
+      const { relativeKey, driver } = getMount(key);
+      if (!driver.removeItem) {
+        return;
+      }
+      await asyncCall(driver.removeItem, relativeKey, opts);
+      if (opts.removeMeta || opts.removeMata) {
+        await asyncCall(driver.removeItem, relativeKey + "$", opts);
+      }
+      if (!driver.watch) {
+        onChange("remove", key);
+      }
+    },
+    // Meta
+    async getMeta(key, opts = {}) {
+      if (typeof opts === "boolean") {
+        opts = { nativeOnly: opts };
+      }
+      key = normalizeKey(key);
+      const { relativeKey, driver } = getMount(key);
+      const meta = /* @__PURE__ */ Object.create(null);
+      if (driver.getMeta) {
+        Object.assign(meta, await asyncCall(driver.getMeta, relativeKey, opts));
+      }
+      if (!opts.nativeOnly) {
+        const value = await asyncCall(
+          driver.getItem,
+          relativeKey + "$",
+          opts
+        ).then((value_) => destr(value_));
+        if (value && typeof value === "object") {
+          if (typeof value.atime === "string") {
+            value.atime = new Date(value.atime);
+          }
+          if (typeof value.mtime === "string") {
+            value.mtime = new Date(value.mtime);
+          }
+          Object.assign(meta, value);
+        }
+      }
+      return meta;
+    },
+    setMeta(key, value, opts = {}) {
+      return this.setItem(key + "$", value, opts);
+    },
+    removeMeta(key, opts = {}) {
+      return this.removeItem(key + "$", opts);
+    },
+    // Keys
+    async getKeys(base, opts = {}) {
+      base = normalizeBaseKey(base);
+      const mounts = getMounts(base, true);
+      let maskedMounts = [];
+      const allKeys = [];
+      let allMountsSupportMaxDepth = true;
+      for (const mount of mounts) {
+        if (!mount.driver.flags?.maxDepth) {
+          allMountsSupportMaxDepth = false;
+        }
+        const rawKeys = await asyncCall(
+          mount.driver.getKeys,
+          mount.relativeBase,
+          opts
+        );
+        for (const key of rawKeys) {
+          const fullKey = mount.mountpoint + normalizeKey(key);
+          if (!maskedMounts.some((p) => fullKey.startsWith(p))) {
+            allKeys.push(fullKey);
+          }
+        }
+        maskedMounts = [
+          mount.mountpoint,
+          ...maskedMounts.filter((p) => !p.startsWith(mount.mountpoint))
+        ];
+      }
+      const shouldFilterByDepth = opts.maxDepth !== void 0 && !allMountsSupportMaxDepth;
+      return allKeys.filter(
+        (key) => (!shouldFilterByDepth || filterKeyByDepth(key, opts.maxDepth)) && filterKeyByBase(key, base)
+      );
+    },
+    // Utils
+    async clear(base, opts = {}) {
+      base = normalizeBaseKey(base);
+      await Promise.all(
+        getMounts(base, false).map(async (m) => {
+          if (m.driver.clear) {
+            return asyncCall(m.driver.clear, m.relativeBase, opts);
+          }
+          if (m.driver.removeItem) {
+            const keys = await m.driver.getKeys(m.relativeBase || "", opts);
+            return Promise.all(
+              keys.map((key) => m.driver.removeItem(key, opts))
+            );
+          }
+        })
+      );
+    },
+    async dispose() {
+      await Promise.all(
+        Object.values(context.mounts).map((driver) => dispose(driver))
+      );
+    },
+    async watch(callback) {
+      await startWatch();
+      context.watchListeners.push(callback);
+      return async () => {
+        context.watchListeners = context.watchListeners.filter(
+          (listener) => listener !== callback
+        );
+        if (context.watchListeners.length === 0) {
+          await stopWatch();
+        }
+      };
+    },
+    async unwatch() {
+      context.watchListeners = [];
+      await stopWatch();
+    },
+    // Mount
+    mount(base, driver) {
+      base = normalizeBaseKey(base);
+      if (base && context.mounts[base]) {
+        throw new Error(`already mounted at ${base}`);
+      }
+      if (base) {
+        context.mountpoints.push(base);
+        context.mountpoints.sort((a, b) => b.length - a.length);
+      }
+      context.mounts[base] = driver;
+      if (context.watching) {
+        Promise.resolve(watch(driver, onChange, base)).then((unwatcher) => {
+          context.unwatch[base] = unwatcher;
+        }).catch(console.error);
+      }
+      return storage;
+    },
+    async unmount(base, _dispose = true) {
+      base = normalizeBaseKey(base);
+      if (!base || !context.mounts[base]) {
+        return;
+      }
+      if (context.watching && base in context.unwatch) {
+        context.unwatch[base]?.();
+        delete context.unwatch[base];
+      }
+      if (_dispose) {
+        await dispose(context.mounts[base]);
+      }
+      context.mountpoints = context.mountpoints.filter((key) => key !== base);
+      delete context.mounts[base];
+    },
+    getMount(key = "") {
+      key = normalizeKey(key) + ":";
+      const m = getMount(key);
+      return {
+        driver: m.driver,
+        base: m.base
+      };
+    },
+    getMounts(base = "", opts = {}) {
+      base = normalizeKey(base);
+      const mounts = getMounts(base, opts.parents);
+      return mounts.map((m) => ({
+        driver: m.driver,
+        base: m.mountpoint
+      }));
+    },
+    // Aliases
+    keys: (base, opts = {}) => storage.getKeys(base, opts),
+    get: (key, opts = {}) => storage.getItem(key, opts),
+    set: (key, value, opts = {}) => storage.setItem(key, value, opts),
+    has: (key, opts = {}) => storage.hasItem(key, opts),
+    del: (key, opts = {}) => storage.removeItem(key, opts),
+    remove: (key, opts = {}) => storage.removeItem(key, opts)
+  };
+  return storage;
+}
+function watch(driver, onChange, base) {
+  return driver.watch ? driver.watch((event, key) => onChange(event, base + key)) : () => {
+  };
+}
+async function dispose(driver) {
+  if (typeof driver.dispose === "function") {
+    await asyncCall(driver.dispose);
+  }
+}
+
 const PERSIST_SYMBOL = /* @__PURE__ */ Symbol();
 const DEFAULT_COOKIE_NAME = "astro-session";
 const VALID_COOKIE_REGEX = /^[\w-]+$/;
@@ -6800,7 +7337,7 @@ const unflatten = (parsed, _) => {
   });
 };
 const stringify = (data, _) => {
-  return stringify$1(data, {
+  return stringify$2(data, {
     // Support URL objects
     URL: (val) => val instanceof URL && val.href
   });
@@ -8377,20 +8914,20 @@ const renderers = [Object.assign({"name":"@astrojs/react","clientEntrypoint":"@a
 const serializedData = [{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"type":"page","component":"_server-islands.astro","params":["name"],"segments":[[{"content":"_server-islands","dynamic":false,"spread":false}],[{"content":"name","dynamic":true,"spread":false}]],"pattern":"^\\/_server-islands\\/([^/]+?)\\/?$","prerender":false,"isIndex":false,"fallbackRoutes":[],"route":"/_server-islands/[name]","origin":"internal","distURL":[],"_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/_image","component":"node_modules/astro/dist/assets/endpoint/generic.js","params":[],"pathname":"/_image","pattern":"^\\/_image\\/?$","segments":[[{"content":"_image","dynamic":false,"spread":false}]],"type":"endpoint","prerender":false,"fallbackRoutes":[],"distURL":[],"isIndex":false,"origin":"internal","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/admin/users","isIndex":true,"type":"page","pattern":"^\\/admin\\/users\\/?$","segments":[[{"content":"admin","dynamic":false,"spread":false}],[{"content":"users","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/admin/users/index.astro","pathname":"/admin/users","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/admin","isIndex":true,"type":"page","pattern":"^\\/admin\\/?$","segments":[[{"content":"admin","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/admin/index.astro","pathname":"/admin","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/resend","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/resend\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"resend","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/resend.ts","pathname":"/api/auth/resend","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/signin","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/signin\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"signin","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/signin.ts","pathname":"/api/auth/signin","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/signout","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/signout\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"signout","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/signout.ts","pathname":"/api/auth/signout","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/signup","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/signup\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"signup","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/signup.ts","pathname":"/api/auth/signup","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/chat/[userid]","isIndex":false,"type":"page","pattern":"^\\/chat\\/([^/]+?)\\/?$","segments":[[{"content":"chat","dynamic":false,"spread":false}],[{"content":"userId","dynamic":true,"spread":false}]],"params":["userId"],"component":"src/pages/chat/[userId].astro","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/chat","isIndex":true,"type":"page","pattern":"^\\/chat\\/?$","segments":[[{"content":"chat","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/chat/index.astro","pathname":"/chat","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/login","isIndex":false,"type":"page","pattern":"^\\/login\\/?$","segments":[[{"content":"login","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/login.astro","pathname":"/login","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/profile/edit","isIndex":false,"type":"page","pattern":"^\\/profile\\/edit\\/?$","segments":[[{"content":"profile","dynamic":false,"spread":false}],[{"content":"edit","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/profile/edit.astro","pathname":"/profile/edit","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/profile","isIndex":true,"type":"page","pattern":"^\\/profile\\/?$","segments":[[{"content":"profile","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/profile/index.astro","pathname":"/profile","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/signup","isIndex":false,"type":"page","pattern":"^\\/signup\\/?$","segments":[[{"content":"signup","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/signup.astro","pathname":"/signup","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/","isIndex":true,"type":"page","pattern":"^\\/$","segments":[],"params":[],"component":"src/pages/index.astro","pathname":"/","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}}];
 				serializedData.map(deserializeRouteInfo);
 
-const _page0 = () => import('./generic_CvWYbCEr.mjs').then(n => n.g);
-const _page1 = () => import('./index_CDEkMhI6.mjs');
-const _page2 = () => import('./index_BMCgAP8c.mjs');
+const _page0 = () => import('./generic_BS32LPd8.mjs').then(n => n.g);
+const _page1 = () => import('./index_BwfmrJgf.mjs');
+const _page2 = () => import('./index_BAzLlxlY.mjs');
 const _page3 = () => import('./resend_D06zcNGD.mjs');
 const _page4 = () => import('./signin_DNOcoEm7.mjs');
 const _page5 = () => import('./signout_DCUVClf6.mjs');
 const _page6 = () => import('./signup_DUV361dS.mjs');
-const _page7 = () => import('./_userId__BnPLMUfx.mjs');
-const _page8 = () => import('./index_DvhfP8pz.mjs');
-const _page9 = () => import('./login_DBTGTWwm.mjs');
-const _page10 = () => import('./edit_ru0_fGcx.mjs');
-const _page11 = () => import('./index_Dd1x8uz7.mjs');
-const _page12 = () => import('./signup_C3oLqI9P.mjs');
-const _page13 = () => import('./index_CSXMJBLg.mjs');
+const _page7 = () => import('./_userId__BKnJ_Ipz.mjs');
+const _page8 = () => import('./index_D2aEi1Q0.mjs');
+const _page9 = () => import('./login_CTjzESN5.mjs');
+const _page10 = () => import('./edit_CWPYO1My.mjs');
+const _page11 = () => import('./index_WBAfTdkr.mjs');
+const _page12 = () => import('./signup_h1hKzL6L.mjs');
+const _page13 = () => import('./index_BeBXiTr1.mjs');
 const pageMap = new Map([
     ["node_modules/astro/dist/assets/endpoint/generic.js", _page0],
     ["src/pages/admin/users/index.astro", _page1],
@@ -8408,7 +8945,7 @@ const pageMap = new Map([
     ["src/pages/index.astro", _page13]
 ]);
 
-const _manifest = deserializeManifest(({"rootDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/","cacheDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/node_modules/.astro/","outDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/dist/","srcDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/src/","publicDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/public/","buildClientDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/dist/client/","buildServerDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/dist/server/","adapterName":"@astrojs/vercel","assetsDir":"_astro","routes":[{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"type":"page","component":"_server-islands.astro","params":["name"],"segments":[[{"content":"_server-islands","dynamic":false,"spread":false}],[{"content":"name","dynamic":true,"spread":false}]],"pattern":"^\\/_server-islands\\/([^/]+?)\\/?$","prerender":false,"isIndex":false,"fallbackRoutes":[],"route":"/_server-islands/[name]","origin":"internal","distURL":[],"_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/_image","component":"node_modules/astro/dist/assets/endpoint/generic.js","params":[],"pathname":"/_image","pattern":"^\\/_image\\/?$","segments":[[{"content":"_image","dynamic":false,"spread":false}]],"type":"endpoint","prerender":false,"fallbackRoutes":[],"distURL":[],"isIndex":false,"origin":"internal","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/admin/users","isIndex":true,"type":"page","pattern":"^\\/admin\\/users\\/?$","segments":[[{"content":"admin","dynamic":false,"spread":false}],[{"content":"users","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/admin/users/index.astro","pathname":"/admin/users","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/admin","isIndex":true,"type":"page","pattern":"^\\/admin\\/?$","segments":[[{"content":"admin","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/admin/index.astro","pathname":"/admin","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/resend","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/resend\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"resend","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/resend.ts","pathname":"/api/auth/resend","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/signin","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/signin\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"signin","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/signin.ts","pathname":"/api/auth/signin","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/signout","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/signout\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"signout","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/signout.ts","pathname":"/api/auth/signout","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/signup","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/signup\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"signup","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/signup.ts","pathname":"/api/auth/signup","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/chat/[userid]","isIndex":false,"type":"page","pattern":"^\\/chat\\/([^/]+?)\\/?$","segments":[[{"content":"chat","dynamic":false,"spread":false}],[{"content":"userId","dynamic":true,"spread":false}]],"params":["userId"],"component":"src/pages/chat/[userId].astro","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/chat","isIndex":true,"type":"page","pattern":"^\\/chat\\/?$","segments":[[{"content":"chat","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/chat/index.astro","pathname":"/chat","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/login","isIndex":false,"type":"page","pattern":"^\\/login\\/?$","segments":[[{"content":"login","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/login.astro","pathname":"/login","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/profile/edit","isIndex":false,"type":"page","pattern":"^\\/profile\\/edit\\/?$","segments":[[{"content":"profile","dynamic":false,"spread":false}],[{"content":"edit","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/profile/edit.astro","pathname":"/profile/edit","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/profile","isIndex":true,"type":"page","pattern":"^\\/profile\\/?$","segments":[[{"content":"profile","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/profile/index.astro","pathname":"/profile","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/signup","isIndex":false,"type":"page","pattern":"^\\/signup\\/?$","segments":[[{"content":"signup","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/signup.astro","pathname":"/signup","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/","isIndex":true,"type":"page","pattern":"^\\/$","segments":[],"params":[],"component":"src/pages/index.astro","pathname":"/","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}}],"serverLike":true,"middlewareMode":"classic","base":"/","trailingSlash":"ignore","compressHTML":true,"experimentalQueuedRendering":{"enabled":false,"poolSize":0,"contentCache":false},"componentMetadata":[["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/admin/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/admin/users/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/chat/[userId].astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/chat/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/login.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/profile/edit.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/profile/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/signup.astro",{"propagation":"none","containsHead":true}]],"renderers":[],"clientDirectives":[["idle","(()=>{var l=(n,t)=>{let i=async()=>{await(await n())()},e=typeof t.value==\"object\"?t.value:void 0,s={timeout:e==null?void 0:e.timeout};\"requestIdleCallback\"in window?window.requestIdleCallback(i,s):setTimeout(i,s.timeout||200)};(self.Astro||(self.Astro={})).idle=l;window.dispatchEvent(new Event(\"astro:idle\"));})();"],["load","(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).load=e;window.dispatchEvent(new Event(\"astro:load\"));})();"],["media","(()=>{var n=(a,t)=>{let i=async()=>{await(await a())()};if(t.value){let e=matchMedia(t.value);e.matches?i():e.addEventListener(\"change\",i,{once:!0})}};(self.Astro||(self.Astro={})).media=n;window.dispatchEvent(new Event(\"astro:media\"));})();"],["only","(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).only=e;window.dispatchEvent(new Event(\"astro:only\"));})();"],["visible","(()=>{var a=(s,i,o)=>{let r=async()=>{await(await s())()},t=typeof i.value==\"object\"?i.value:void 0,c={rootMargin:t==null?void 0:t.rootMargin},n=new IntersectionObserver(e=>{for(let l of e)if(l.isIntersecting){n.disconnect(),r();break}},c);for(let e of o.children)n.observe(e)};(self.Astro||(self.Astro={})).visible=a;window.dispatchEvent(new Event(\"astro:visible\"));})();"]],"entryModules":{"\u0000virtual:astro:actions/noop-entrypoint":"chunks/noop-entrypoint_BOlrdqWF.mjs","\u0000virtual:astro:middleware":"virtual_astro_middleware.mjs","\u0000virtual:astro:session-driver":"chunks/_virtual_astro_session-driver_DYx9Bb3p.mjs","\u0000virtual:astro:server-island-manifest":"chunks/_virtual_astro_server-island-manifest_CQQ1F5PF.mjs","astro/entrypoints/prerender":"prerender-entry.DSIUACtq.mjs","@astrojs/vercel/entrypoint":"entry.mjs","\u0000virtual:astro:page:src/pages/admin/users/index@_@astro":"chunks/index_CDEkMhI6.mjs","\u0000virtual:astro:page:src/pages/admin/index@_@astro":"chunks/index_BMCgAP8c.mjs","\u0000virtual:astro:page:src/pages/api/auth/resend@_@ts":"chunks/resend_D06zcNGD.mjs","\u0000virtual:astro:page:src/pages/api/auth/signin@_@ts":"chunks/signin_DNOcoEm7.mjs","\u0000virtual:astro:page:src/pages/api/auth/signout@_@ts":"chunks/signout_DCUVClf6.mjs","\u0000virtual:astro:page:src/pages/api/auth/signup@_@ts":"chunks/signup_DUV361dS.mjs","\u0000virtual:astro:page:src/pages/chat/[userId]@_@astro":"chunks/_userId__BnPLMUfx.mjs","\u0000virtual:astro:page:src/pages/chat/index@_@astro":"chunks/index_DvhfP8pz.mjs","\u0000virtual:astro:page:src/pages/login@_@astro":"chunks/login_DBTGTWwm.mjs","\u0000virtual:astro:page:src/pages/profile/edit@_@astro":"chunks/edit_ru0_fGcx.mjs","\u0000virtual:astro:page:src/pages/profile/index@_@astro":"chunks/index_Dd1x8uz7.mjs","\u0000virtual:astro:page:src/pages/signup@_@astro":"chunks/signup_C3oLqI9P.mjs","\u0000virtual:astro:page:src/pages/index@_@astro":"chunks/index_CSXMJBLg.mjs","C:/Users/Jarvis/Desktop/New folder (2)/chat/node_modules/astro/dist/assets/services/sharp.js":"chunks/sharp_uiqgDxWR.mjs","@astrojs/react/client.js":"_astro/client.CkHAg1GX.js","C:/Users/Jarvis/Desktop/New folder (2)/chat/src/components/ChatApp":"_astro/ChatApp.C_PRXc-O.js","astro:scripts/before-hydration.js":""},"inlinedScripts":[],"assets":["/_astro/ChatApp.C_PRXc-O.js","/_astro/client.CkHAg1GX.js","/_astro/index.Cq60tPVO.js","/_astro/Layout.CUWdoH7s.css"],"buildFormat":"directory","checkOrigin":true,"actionBodySizeLimit":1048576,"serverIslandBodySizeLimit":1048576,"allowedDomains":[],"key":"nz6SEuU4mgZfzf9k4MChPC0wER/8HzPNw7gu8MvD80M=","image":{},"devToolbar":{"enabled":false,"debugInfoOutput":""},"logLevel":"info","shouldInjectCspMetaTags":false}));
+const _manifest = deserializeManifest(({"rootDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/","cacheDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/node_modules/.astro/","outDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/dist/","srcDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/src/","publicDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/public/","buildClientDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/dist/client/","buildServerDir":"file:///C:/Users/Jarvis/Desktop/New%20folder%20(2)/chat/dist/server/","adapterName":"@astrojs/vercel","assetsDir":"_astro","routes":[{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"type":"page","component":"_server-islands.astro","params":["name"],"segments":[[{"content":"_server-islands","dynamic":false,"spread":false}],[{"content":"name","dynamic":true,"spread":false}]],"pattern":"^\\/_server-islands\\/([^/]+?)\\/?$","prerender":false,"isIndex":false,"fallbackRoutes":[],"route":"/_server-islands/[name]","origin":"internal","distURL":[],"_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/_image","component":"node_modules/astro/dist/assets/endpoint/generic.js","params":[],"pathname":"/_image","pattern":"^\\/_image\\/?$","segments":[[{"content":"_image","dynamic":false,"spread":false}]],"type":"endpoint","prerender":false,"fallbackRoutes":[],"distURL":[],"isIndex":false,"origin":"internal","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/admin/users","isIndex":true,"type":"page","pattern":"^\\/admin\\/users\\/?$","segments":[[{"content":"admin","dynamic":false,"spread":false}],[{"content":"users","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/admin/users/index.astro","pathname":"/admin/users","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/admin","isIndex":true,"type":"page","pattern":"^\\/admin\\/?$","segments":[[{"content":"admin","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/admin/index.astro","pathname":"/admin","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/resend","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/resend\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"resend","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/resend.ts","pathname":"/api/auth/resend","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/signin","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/signin\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"signin","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/signin.ts","pathname":"/api/auth/signin","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/signout","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/signout\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"signout","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/signout.ts","pathname":"/api/auth/signout","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[],"routeData":{"route":"/api/auth/signup","isIndex":false,"type":"endpoint","pattern":"^\\/api\\/auth\\/signup\\/?$","segments":[[{"content":"api","dynamic":false,"spread":false}],[{"content":"auth","dynamic":false,"spread":false}],[{"content":"signup","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/api/auth/signup.ts","pathname":"/api/auth/signup","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/chat/[userid]","isIndex":false,"type":"page","pattern":"^\\/chat\\/([^/]+?)\\/?$","segments":[[{"content":"chat","dynamic":false,"spread":false}],[{"content":"userId","dynamic":true,"spread":false}]],"params":["userId"],"component":"src/pages/chat/[userId].astro","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/chat","isIndex":true,"type":"page","pattern":"^\\/chat\\/?$","segments":[[{"content":"chat","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/chat/index.astro","pathname":"/chat","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/login","isIndex":false,"type":"page","pattern":"^\\/login\\/?$","segments":[[{"content":"login","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/login.astro","pathname":"/login","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/profile/edit","isIndex":false,"type":"page","pattern":"^\\/profile\\/edit\\/?$","segments":[[{"content":"profile","dynamic":false,"spread":false}],[{"content":"edit","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/profile/edit.astro","pathname":"/profile/edit","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/profile","isIndex":true,"type":"page","pattern":"^\\/profile\\/?$","segments":[[{"content":"profile","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/profile/index.astro","pathname":"/profile","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/signup","isIndex":false,"type":"page","pattern":"^\\/signup\\/?$","segments":[[{"content":"signup","dynamic":false,"spread":false}]],"params":[],"component":"src/pages/signup.astro","pathname":"/signup","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}},{"file":"","links":[],"scripts":[],"styles":[{"type":"external","src":"_astro/Layout.CUWdoH7s.css"}],"routeData":{"route":"/","isIndex":true,"type":"page","pattern":"^\\/$","segments":[],"params":[],"component":"src/pages/index.astro","pathname":"/","prerender":false,"fallbackRoutes":[],"distURL":[],"origin":"project","_meta":{"trailingSlash":"ignore"}}}],"serverLike":true,"middlewareMode":"classic","base":"/","trailingSlash":"ignore","compressHTML":true,"experimentalQueuedRendering":{"enabled":false,"poolSize":0,"contentCache":false},"componentMetadata":[["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/admin/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/admin/users/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/chat/[userId].astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/chat/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/login.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/profile/edit.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/profile/index.astro",{"propagation":"none","containsHead":true}],["C:/Users/Jarvis/Desktop/New folder (2)/chat/src/pages/signup.astro",{"propagation":"none","containsHead":true}]],"renderers":[],"clientDirectives":[["idle","(()=>{var l=(n,t)=>{let i=async()=>{await(await n())()},e=typeof t.value==\"object\"?t.value:void 0,s={timeout:e==null?void 0:e.timeout};\"requestIdleCallback\"in window?window.requestIdleCallback(i,s):setTimeout(i,s.timeout||200)};(self.Astro||(self.Astro={})).idle=l;window.dispatchEvent(new Event(\"astro:idle\"));})();"],["load","(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).load=e;window.dispatchEvent(new Event(\"astro:load\"));})();"],["media","(()=>{var n=(a,t)=>{let i=async()=>{await(await a())()};if(t.value){let e=matchMedia(t.value);e.matches?i():e.addEventListener(\"change\",i,{once:!0})}};(self.Astro||(self.Astro={})).media=n;window.dispatchEvent(new Event(\"astro:media\"));})();"],["only","(()=>{var e=async t=>{await(await t())()};(self.Astro||(self.Astro={})).only=e;window.dispatchEvent(new Event(\"astro:only\"));})();"],["visible","(()=>{var a=(s,i,o)=>{let r=async()=>{await(await s())()},t=typeof i.value==\"object\"?i.value:void 0,c={rootMargin:t==null?void 0:t.rootMargin},n=new IntersectionObserver(e=>{for(let l of e)if(l.isIntersecting){n.disconnect(),r();break}},c);for(let e of o.children)n.observe(e)};(self.Astro||(self.Astro={})).visible=a;window.dispatchEvent(new Event(\"astro:visible\"));})();"]],"entryModules":{"\u0000virtual:astro:actions/noop-entrypoint":"chunks/noop-entrypoint_BOlrdqWF.mjs","\u0000virtual:astro:middleware":"virtual_astro_middleware.mjs","\u0000virtual:astro:session-driver":"chunks/_virtual_astro_session-driver_DYx9Bb3p.mjs","\u0000virtual:astro:server-island-manifest":"chunks/_virtual_astro_server-island-manifest_CQQ1F5PF.mjs","astro/entrypoints/prerender":"prerender-entry.BT5bMqGD.mjs","@astrojs/vercel/entrypoint":"entry.mjs","\u0000virtual:astro:page:src/pages/admin/users/index@_@astro":"chunks/index_BwfmrJgf.mjs","\u0000virtual:astro:page:src/pages/admin/index@_@astro":"chunks/index_BAzLlxlY.mjs","\u0000virtual:astro:page:src/pages/api/auth/resend@_@ts":"chunks/resend_D06zcNGD.mjs","\u0000virtual:astro:page:src/pages/api/auth/signin@_@ts":"chunks/signin_DNOcoEm7.mjs","\u0000virtual:astro:page:src/pages/api/auth/signout@_@ts":"chunks/signout_DCUVClf6.mjs","\u0000virtual:astro:page:src/pages/api/auth/signup@_@ts":"chunks/signup_DUV361dS.mjs","\u0000virtual:astro:page:src/pages/chat/[userId]@_@astro":"chunks/_userId__BKnJ_Ipz.mjs","\u0000virtual:astro:page:src/pages/chat/index@_@astro":"chunks/index_D2aEi1Q0.mjs","\u0000virtual:astro:page:src/pages/login@_@astro":"chunks/login_CTjzESN5.mjs","\u0000virtual:astro:page:src/pages/profile/edit@_@astro":"chunks/edit_CWPYO1My.mjs","\u0000virtual:astro:page:src/pages/profile/index@_@astro":"chunks/index_WBAfTdkr.mjs","\u0000virtual:astro:page:src/pages/signup@_@astro":"chunks/signup_h1hKzL6L.mjs","\u0000virtual:astro:page:src/pages/index@_@astro":"chunks/index_BeBXiTr1.mjs","C:/Users/Jarvis/Desktop/New folder (2)/chat/node_modules/astro/dist/assets/services/sharp.js":"chunks/sharp_D5HXn1Tv.mjs","@astrojs/react/client.js":"_astro/client.CkHAg1GX.js","C:/Users/Jarvis/Desktop/New folder (2)/chat/src/components/ChatApp":"_astro/ChatApp.CfhyzErn.js","astro:scripts/before-hydration.js":""},"inlinedScripts":[],"assets":["/_astro/ChatApp.CfhyzErn.js","/_astro/client.CkHAg1GX.js","/_astro/index.Cq60tPVO.js","/_astro/Layout.CUWdoH7s.css"],"buildFormat":"directory","checkOrigin":true,"actionBodySizeLimit":1048576,"serverIslandBodySizeLimit":1048576,"allowedDomains":[],"key":"I9liC20s5BHoXEfS3hLTS13WdyWkwD6YA5PfQiUb+qs=","image":{},"devToolbar":{"enabled":false,"debugInfoOutput":""},"logLevel":"info","shouldInjectCspMetaTags":false}));
 					const manifestRoutes = _manifest.routes;
 					
 					const manifest = Object.assign(_manifest, {
