@@ -136,3 +136,96 @@ CREATE TRIGGER update_last_seen_trigger
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW
   EXECUTE FUNCTION public.update_last_seen();
+
+-- Reactions table
+CREATE TABLE public.reactions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  message_id UUID REFERENCES public.messages(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  emoji TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(message_id, user_id, emoji)
+);
+
+-- Reply references
+ALTER TABLE public.messages ADD COLUMN reply_to UUID REFERENCES public.messages(id) ON DELETE SET NULL;
+
+-- Pinned messages table
+CREATE TABLE public.pinned_messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  message_id UUID REFERENCES public.messages(id) ON DELETE CASCADE UNIQUE NOT NULL,
+  pinned_by UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Chat rooms table for future group chats
+CREATE TABLE public.chat_rooms (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_by UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  is_private BOOLEAN DEFAULT false NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE public.chat_room_members (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  room_id UUID REFERENCES public.chat_rooms(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  joined_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(room_id, user_id)
+);
+
+-- Reactions Policies
+ALTER TABLE public.reactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Reactions are viewable by everyone."
+  ON public.reactions FOR SELECT
+  USING ( true );
+
+CREATE POLICY "Authenticated users can add reactions."
+  ON public.reactions FOR INSERT
+  WITH CHECK ( auth.uid() = user_id );
+
+CREATE POLICY "Users can remove their own reactions."
+  ON public.reactions FOR DELETE
+  USING ( auth.uid() = user_id );
+
+-- Pinned messages Policies
+ALTER TABLE public.pinned_messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Pinned messages are viewable by everyone."
+  ON public.pinned_messages FOR SELECT
+  USING ( true );
+
+CREATE POLICY "Users can pin messages."
+  ON public.pinned_messages FOR INSERT
+  WITH CHECK ( auth.uid() = pinned_by );
+
+CREATE POLICY "Users can unpin messages they pinned."
+  ON public.pinned_messages FOR DELETE
+  USING ( auth.uid() = pinned_by );
+
+-- Chat rooms Policies
+ALTER TABLE public.chat_rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_room_members ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Chat rooms are viewable by everyone."
+  ON public.chat_rooms FOR SELECT
+  USING ( true );
+
+CREATE POLICY "Authenticated users can create chat rooms."
+  ON public.chat_rooms FOR INSERT
+  WITH CHECK ( auth.uid() = created_by );
+
+CREATE POLICY "Room members can view their rooms."
+  ON public.chat_room_members FOR SELECT
+  USING ( auth.uid() = user_id );
+
+CREATE POLICY "Users can join rooms."
+  ON public.chat_room_members FOR INSERT
+  WITH CHECK ( auth.uid() = user_id );
+
+-- Enable Realtime for new tables
+ALTER PUBLICATION supabase_realtime ADD TABLE public.reactions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pinned_messages;
