@@ -15,8 +15,6 @@ export const supabaseClient = (context: { request: { headers: { get: (key: strin
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Missing Supabase environment variables. Please check PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY.');
-    // Return a dummy client or throw a more descriptive error
-    // Throwing here will be caught by Astro's 500 handler
     throw new Error('Supabase environment variables are not defined');
   }
 

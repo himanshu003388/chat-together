@@ -34,7 +34,13 @@ function parseCookieHeader(cookieHeader) {
 
 const protectedRoutes = ["/profile", "/chat", "/admin"];
 const onRequest$1 = defineMiddleware(async (context, next) => {
-  const supabase = supabaseClient(context);
+  let supabase;
+  try {
+    supabase = supabaseClient(context);
+  } catch (err) {
+    console.error("Supabase initialization failed:", err);
+    return new Response("Service unavailable - configuration error", { status: 500 });
+  }
   context.locals.supabase = supabase;
   const {
     data: { user }
@@ -42,18 +48,24 @@ const onRequest$1 = defineMiddleware(async (context, next) => {
   context.locals.user = user;
   const url = new URL(context.request.url);
   if (user) {
-    let { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-    if (!profile && user.email) {
-      const username = user.user_metadata?.username || user.email.split("@")[0];
-      const { data: newProfile, error } = await supabase.from("profiles").insert({
-        id: user.id,
-        username,
-        email: user.email,
-        role: "user"
-      }).select().single();
-      if (!error) {
-        profile = newProfile;
+    let profile = null;
+    try {
+      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+      profile = data;
+      if (!profile && user.email) {
+        const username = user.user_metadata?.username || user.email.split("@")[0];
+        const { data: newProfile, error } = await supabase.from("profiles").insert({
+          id: user.id,
+          username,
+          email: user.email,
+          role: "user"
+        }).select().single();
+        if (!error) {
+          profile = newProfile;
+        }
       }
+    } catch (err) {
+      console.error("Profile fetch error:", err);
     }
     context.locals.profile = profile;
     if (profile?.is_banned && protectedRoutes.some((route) => url.pathname.startsWith(route))) {

@@ -2,7 +2,7 @@ import { $ as $$Layout } from './Layout_C_TQ-mLw.mjs';
 import { c as createComponent } from './astro-component_ChyAuDe0.mjs';
 import 'piccolore';
 import { Q as renderTemplate, z as maybeRenderHead } from './params-and-props_Bdc0UXF-.mjs';
-import { r as renderComponent } from './entrypoint_CY5oGq1D.mjs';
+import { r as renderComponent } from './entrypoint_CZzd4IbP.mjs';
 import { C as ChatApp } from './ChatApp_BoJVYUZk.mjs';
 
 const $$userId = createComponent(async ($$result, $$props, $$slots) => {

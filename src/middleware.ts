@@ -4,8 +4,14 @@ import { supabaseClient } from "./lib/supabase";
 const protectedRoutes = ["/profile", "/chat", "/admin"];
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  const supabase = supabaseClient(context);
-  
+  let supabase;
+  try {
+    supabase = supabaseClient(context);
+  } catch (err) {
+    console.error('Supabase initialization failed:', err);
+    return new Response('Service unavailable - configuration error', { status: 500 });
+  }
+
   // Set supabase client to locals
   context.locals.supabase = supabase;
 
@@ -20,25 +26,31 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // If user is logged in, fetch their profile
   if (user) {
-    let { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle();
+    let profile = null;
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+      profile = data;
 
-    // Create profile if it doesn't exist (handle cases where signup trigger failed)
-    if (!profile && user.email) {
-      const username = user.user_metadata?.username || user.email.split('@')[0];
-      const { data: newProfile, error } = await supabase.from('profiles').insert({
-        id: user.id,
-        username,
-        email: user.email,
-        role: 'user',
-      }).select().single();
-      
-      if (!error) {
-        profile = newProfile;
+      // Create profile if it doesn't exist
+      if (!profile && user.email) {
+        const username = user.user_metadata?.username || user.email.split('@')[0];
+        const { data: newProfile, error } = await supabase.from('profiles').insert({
+          id: user.id,
+          username,
+          email: user.email,
+          role: 'user',
+        }).select().single();
+
+        if (!error) {
+          profile = newProfile;
+        }
       }
+    } catch (err) {
+      console.error('Profile fetch error:', err);
     }
 
     // Set profile to locals
