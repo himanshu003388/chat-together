@@ -10,9 +10,19 @@ interface CookieOptions {
 }
 
 export const supabaseClient = (context: { request: { headers: { get: (key: string) => string | null } }; cookies: { set: (name: string, value: string, options?: CookieOptions) => void } }) => {
+  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing Supabase environment variables. Please check PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY.');
+    // Return a dummy client or throw a more descriptive error
+    // Throwing here will be caught by Astro's 500 handler
+    throw new Error('Supabase environment variables are not defined');
+  }
+
   return createServerClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
