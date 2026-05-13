@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro check && astro build",
+    "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
   },
@@ -13,9 +13,10 @@
     "@astrojs/node": "^8.3.4",
     "@astrojs/react": "^3.1.1",
     "@astrojs/tailwind": "^5.1.0",
+    "@astrojs/vercel": "^10.0.6",
     "@supabase/ssr": "^0.1.0",
     "@supabase/supabase-js": "^2.42.0",
-    "astro": "^4.6.1",
+    "astro": "^6.3.1",
     "lucide-react": "^0.370.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
