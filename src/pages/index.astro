@@ -11,90 +11,17 @@ const error = Astro.url.searchParams.get('error');
 <Layout title="ChatTogether" hideNav={!!user}>
 	{user ? (
 		<div class="h-full flex flex-col bg-surface-primary overflow-hidden">
-			{/* Modern Header */}
-			<header class="glass border-b border-white/5 px-8 py-4">
-				<div class="max-w-7xl mx-auto flex items-center justify-between">
-					<div class="flex items-center gap-4 group cursor-pointer">
-						<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center shadow-glow-cyan">
-							<span class="text-white font-bold text-lg">C</span>
-						</div>
-						<div>
-							<h1 class="text-xl font-bold tracking-tight">Network Hub</h1>
-							<p class="text-xs text-white/40 font-mono">Connected</p>
-						</div>
-					</div>
-
-					<nav class="flex items-center gap-6">
-						<div class="hidden lg:flex items-center gap-2">
-							<a href="/chat" class="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Messages</a>
-							<a href="/chat/rooms" class="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Communities</a>
-							<a href="/profile" class="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Profile</a>
-						</div>
-						<div class="flex items-center gap-4 pl-6 border-l border-white/10">
-							<div class="text-right hidden sm:block">
-								<p class="text-sm font-medium text-white">{profile?.username || user.email}</p>
-								<div class="flex items-center justify-end gap-2 mt-0.5">
-									<span class="w-2 h-2 bg-accent-emerald rounded-full animate-pulse"></span>
-									<span class="text-xs text-accent-emerald font-mono">Online</span>
-								</div>
-							</div>
-							<form action="/api/auth/signout" method="post">
-								<button type="submit" class="p-2.5 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-white/60 transition-all">
-									<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-									</svg>
-								</button>
-							</form>
-						</div>
-					</nav>
-				</div>
-			</header>
-
-			{/* Main Content */}
-			<main class="flex-1 p-6 overflow-hidden">
-				<div class="max-w-7xl mx-auto h-full flex gap-6">
-					{/* Sidebar */}
-					<div class="w-72 hidden xl:flex flex-col gap-4">
-						<div class="glass-card p-6">
-							<p class="text-xs text-white/40 font-mono mb-2">Welcome back</p>
-							<h2 class="text-2xl font-bold mb-2">{profile?.username || 'User'}</h2>
-							<p class="text-sm text-white/60">Ready to connect with your network</p>
-						</div>
-
-						<div class="grid grid-cols-2 gap-3">
-							<div class="glass-card p-4 hover:border-accent-cyan/30 transition-all cursor-pointer group">
-								<p class="text-xs text-white/40 mb-1">Active Chats</p>
-								<p class="text-2xl font-bold text-accent-cyan group-hover:text-accent-cyan/80">3</p>
-							</div>
-							<div class="glass-card p-4 hover:border-accent-purple/30 transition-all cursor-pointer group">
-								<p class="text-xs text-white/40 mb-1">Messages</p>
-								<p class="text-2xl font-bold text-accent-purple group-hover:text-accent-purple/80">24</p>
-							</div>
-						</div>
-
-						<div class="glass-card p-4 mt-auto">
-							<div class="flex items-center gap-3">
-								<div class="w-3 h-3 rounded-full bg-accent-emerald animate-pulse"></div>
-								<span class="text-sm text-white/70 font-mono">System operational</span>
-							</div>
-						</div>
-					</div>
-
-					{/* Chat Container */}
-					<div class="flex-1 flex flex-col min-w-0">
-						<div class="flex-1 overflow-hidden rounded-2xl glass-card border border-white/10">
-							<GeneralChat
-								client:load
-								currentUser={{
-									id: user.id,
-									email: user.email || '',
-									username: profile?.username
-								}}
-							/>
-						</div>
-					</div>
-				</div>
-			</main>
+			{/* Main Content - just the chat component, nav is in Layout */}
+			<div class="flex-1 overflow-hidden">
+				<GeneralChat
+					client:load
+					currentUser={{
+						id: user.id,
+						email: user.email || '',
+						username: profile?.username
+					}}
+				/>
+			</div>
 		</div>
 	) : (
 		<div class="min-h-screen bg-surface-primary flex flex-col relative overflow-hidden">
