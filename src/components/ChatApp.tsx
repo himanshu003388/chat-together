@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabaseBrowser';
 import { ChatService } from '../services/chat.service';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Send, User, MoreVertical, Check, CheckCheck, Phone, Video, Paperclip, X, FileText, Download, ChevronLeft, MessageCircle, Calendar } from 'lucide-react';
+import { Search, Send, User, MoreVertical, Check, CheckCheck, Phone, Video, Paperclip, X, FileText, Download, ChevronLeft, MessageCircle } from 'lucide-react';
 
 interface Profile {
   id: string;
