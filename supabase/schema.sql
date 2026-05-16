@@ -1,7 +1,10 @@
 -- ==========================================
--- Fix: Add missing file_name column to messages (safe for existing DB)
+-- Fix: Add missing columns to messages (safe for existing DB)
 -- ==========================================
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_name TEXT;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_type TEXT;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_url TEXT;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS reply_to UUID REFERENCES public.messages(id) ON DELETE SET NULL;
 
 -- ==========================================
 -- 1. TABLES (Use IF NOT EXISTS for existing databases)
