@@ -147,6 +147,15 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
     };
   }, [roomId, currentUser.id]);
 
+  // Polling fallback for reliability
+  useEffect(() => {
+    if (!roomId) return;
+    const interval = setInterval(() => {
+      fetchMessages();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [roomId]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, otherUserTyping]);

@@ -124,6 +124,15 @@ export default function ChatApp({
     };
   }, [activeUserId, currentUser.id]);
 
+  // Polling fallback for reliability
+  useEffect(() => {
+    if (!activeUserId) return;
+    const interval = setInterval(() => {
+      fetchMessages();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [activeUserId]);
+
   const fetchMessages = async () => {
     if (!activeUserId) return;
     setLoadingMessages(true);

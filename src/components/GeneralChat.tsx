@@ -126,6 +126,15 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
     };
   }, [currentUser.id]);
 
+  // Polling fallback for reliability
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchMessages();
+      fetchPinnedMessages();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, filteredMessages]);
