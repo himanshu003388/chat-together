@@ -10,14 +10,14 @@ if (!user) {
 }
 ---
 
-<Layout title="Rooms - ChatApp">
-  <div class="flex-1 bg-gray-50 overflow-y-auto">
-    <ChatRooms 
-      client:load 
-      currentUser={{ 
-        id: user.id, 
-        username: profile?.username 
-      }} 
+<Layout title="Rooms">
+  <div class="flex-1 h-[calc(100vh-64px)] bg-surface-primary overflow-y-auto">
+    <ChatRooms
+      client:load
+      currentUser={{
+        id: user.id,
+        username: profile?.username
+      }}
     />
   </div>
 </Layout>
