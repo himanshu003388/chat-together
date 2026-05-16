@@ -12,53 +12,56 @@ const { data: profile } = await supabase
 
 ---
 
-<Layout title="Profile - ChatApp">
-	<div class="max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8 w-full">
-		<div class="bg-white shadow overflow-hidden sm:rounded-lg">
-			<div class="px-4 py-5 sm:px-6 flex justify-between items-center">
-				<div>
-					<h3 class="text-lg leading-6 font-medium text-gray-900">User Profile</h3>
-					<p class="mt-1 max-w-2xl text-sm text-gray-500">Personal details and application settings.</p>
-				</div>
-				<a href="/profile/edit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
-					Edit Profile
-				</a>
+<Layout title="Protocol Identity">
+	<div class="max-w-4xl mx-auto py-20 px-8 w-full flex flex-col gap-12">
+		<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-3 border-elite-black pb-12">
+			<div>
+				<span class="text-[10px] font-black uppercase tracking-[0.3em] text-elite-neutral-400 mb-2 block">Network Node Identity</span>
+				<h1 class="text-6xl font-black text-elite-black tracking-tightest uppercase leading-none">Profile</h1>
 			</div>
-			<div class="border-t border-gray-200">
-				<dl>
-					<div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-gray-500">Avatar</dt>
-						<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-							{profile?.avatar_url ? (
-								<img src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${profile.avatar_url}`} alt="Avatar" class="h-16 w-16 rounded-full object-cover" />
-							) : (
-								<div class="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-800 font-bold text-xl">
-									{profile?.username?.charAt(0).toUpperCase()}
-								</div>
-							)}
-						</dd>
-					</div>
-					<div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-gray-500">Username</dt>
-						<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{profile?.username}</dd>
-					</div>
-					<div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-gray-500">Email address</dt>
-						<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{profile?.email}</dd>
-					</div>
-					<div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-gray-500">Bio</dt>
-						<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{profile?.bio || 'No bio provided.'}</dd>
-					</div>
-					<div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-gray-500">Role</dt>
-						<dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 capitalize">
-							<span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${profile?.role === 'admin' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-								{profile?.role}
-							</span>
-						</dd>
-					</div>
-				</dl>
+			<a href="/profile/edit" class="elite-button bg-elite-black text-white shadow-[6px_6px_0px_0px_rgba(0,0,0,0.2)] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-1 hover:-translate-y-1">
+				MODIFY PROTOCOL
+			</a>
+		</div>
+
+		<div class="bg-white elite-border overflow-hidden shadow-[16px_16px_0px_0px_rgba(0,0,0,0.03)]">
+			<div class="grid grid-cols-1 divide-y divide-elite-black">
+				<div class="p-10 md:grid md:grid-cols-3 md:gap-12 bg-elite-neutral-50/50">
+					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400 mb-4 md:mb-0">Signal Avatar</dt>
+					<dd class="md:col-span-2">
+						{profile?.avatar_url ? (
+							<img src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${profile.avatar_url}`} alt="" class="h-24 w-24 elite-border object-cover bg-white p-1" />
+						) : (
+							<div class="h-24 w-24 elite-border flex items-center justify-center bg-elite-black text-white font-black text-3xl">
+								{profile?.username?.charAt(0).toUpperCase()}
+							</div>
+						)}
+					</dd>
+				</div>
+				
+				<div class="p-10 md:grid md:grid-cols-3 md:gap-12">
+					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Node Alias</dt>
+					<dd class="md:col-span-2 font-black uppercase tracking-tighter text-xl">{profile?.username}</dd>
+				</div>
+
+				<div class="p-10 md:grid md:grid-cols-3 md:gap-12 bg-elite-neutral-50/50">
+					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Secure Email</dt>
+					<dd class="md:col-span-2 font-mono text-sm uppercase font-bold text-elite-neutral-600">{profile?.email}</dd>
+				</div>
+
+				<div class="p-10 md:grid md:grid-cols-3 md:gap-12">
+					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Transmission Bio</dt>
+					<dd class="md:col-span-2 text-sm font-medium italic leading-relaxed">"{profile?.bio || 'NO ENCRYPTED DATA PROVIDED.'}"</dd>
+				</div>
+
+				<div class="p-10 md:grid md:grid-cols-3 md:gap-12 bg-elite-neutral-50/50">
+					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Access Authority</dt>
+					<dd class="md:col-span-2">
+						<span class={`elite-border px-4 py-1 text-[10px] font-black uppercase tracking-widest ${profile?.role === 'admin' ? 'bg-elite-black text-white shadow-[4px_4px_0px_0px_rgba(255,255,255,0.1)]' : 'bg-white text-elite-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'}`}>
+							{profile?.role} LEVEL
+						</span>
+					</dd>
+				</div>
 			</div>
 		</div>
 	</div>

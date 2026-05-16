@@ -5,8 +5,9 @@ interface CookieOptions {
   expires?: Date;
   domain?: string;
   secure?: boolean;
-  sameSite?: 'lax' | 'strict' | 'none';
+  sameSite?: boolean | 'lax' | 'strict' | 'none';
   httpOnly?: boolean;
+  maxAge?: number;
 }
 
 export const supabaseClient = (context: { request: { headers: { get: (key: string) => string | null } }; cookies: { set: (name: string, value: string, options?: CookieOptions) => void } }) => {

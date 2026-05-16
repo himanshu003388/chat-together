@@ -1,0 +1,60 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import RoomChat from '../../../components/RoomChat';
+
+const { id } = Astro.params;
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+const supabase = Astro.locals.supabase;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+// Fetch room details
+const { data: room, error } = await supabase
+  .from('chat_rooms')
+  .select('*')
+  .eq('id', id)
+  .single();
+
+if (error || !room) {
+  return Astro.redirect('/chat/rooms');
+}
+
+// Ensure user is a member
+const { data: membership } = await supabase
+  .from('chat_room_members')
+  .select('*')
+  .eq('room_id', id)
+  .eq('user_id', user.id)
+  .maybeSingle();
+
+if (!membership) {
+  // Auto-join for public rooms
+  if (!room.is_private) {
+    await supabase.from('chat_room_members').insert({
+      room_id: id,
+      user_id: user.id
+    });
+  } else {
+    return Astro.redirect('/chat/rooms?error=Private room');
+  }
+}
+---
+
+<Layout title={`${room.name.toUpperCase()} — NODE`}>
+  <div class="flex-1 h-[calc(100vh-80px)] overflow-hidden">
+    <div class="h-full">
+      <RoomChat 
+        client:load 
+        roomId={id!} 
+        roomName={room.name}
+        currentUser={{ 
+          id: user.id, 
+          username: profile?.username 
+        }} 
+      />
+    </div>
+  </div>
+</Layout>

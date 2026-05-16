@@ -1,0 +1,23 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import ChatRooms from '../../../components/ChatRooms';
+
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+---
+
+<Layout title="Rooms - ChatApp">
+  <div class="flex-1 bg-gray-50 overflow-y-auto">
+    <ChatRooms 
+      client:load 
+      currentUser={{ 
+        id: user.id, 
+        username: profile?.username 
+      }} 
+    />
+  </div>
+</Layout>

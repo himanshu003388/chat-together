@@ -48,57 +48,59 @@ if (Astro.request.method === 'POST') {
 }
 ---
 
-<Layout title="Edit Profile - ChatApp">
-	<div class="max-w-2xl mx-auto py-10 px-4 sm:px-6 lg:px-8 w-full">
-		<div class="bg-white shadow overflow-hidden sm:rounded-lg p-6">
-			<h3 class="text-lg leading-6 font-medium text-gray-900 mb-6">Edit Profile</h3>
-			
+<Layout title="Modify Protocol">
+	<div class="max-w-4xl mx-auto py-20 px-8 w-full flex flex-col gap-12">
+		<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-3 border-elite-black pb-12">
+			<div>
+				<span class="text-[10px] font-black uppercase tracking-[0.3em] text-elite-neutral-400 mb-2 block">System Configuration</span>
+				<h1 class="text-6xl font-black text-elite-black tracking-tightest uppercase leading-none">Settings</h1>
+			</div>
+			<a href="/profile" class="text-xs font-black uppercase tracking-widest hover:line-through">
+				ABORT CHANGES
+			</a>
+		</div>
+
+		<div class="bg-white elite-border overflow-hidden shadow-[16px_16px_0px_0px_rgba(0,0,0,0.03)] p-12">
 			{errorMessage && (
-				<div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
-					<div class="flex">
-						<div class="ml-3">
-							<p class="text-sm text-red-700">{errorMessage}</p>
-						</div>
-					</div>
+				<div class="bg-elite-black text-white p-6 elite-border mb-12 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.1)]">
+					<p class="text-[10px] font-black uppercase tracking-widest">{errorMessage}</p>
 				</div>
 			)}
 
-			<form method="post" enctype="multipart/form-data" class="space-y-6">
-				<div>
-					<label class="block text-sm font-medium text-gray-700">Avatar</label>
-					<div class="mt-1 flex items-center space-x-5">
-						<span class="inline-block h-12 w-12 rounded-full overflow-hidden bg-gray-100">
+			<form method="post" enctype="multipart/form-data" class="space-y-12">
+				<div class="space-y-6">
+					<label class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Signal Avatar</label>
+					<div class="flex items-center gap-10">
+						<div class="h-24 w-24 elite-border overflow-hidden bg-elite-neutral-50 flex items-center justify-center p-1">
 							{profile?.avatar_url ? (
-								<img src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${profile.avatar_url}`} alt="Avatar" class="h-full w-full object-cover" />
+								<img src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${profile.avatar_url}`} alt="" class="h-full w-full object-cover" />
 							) : (
-								<svg class="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24">
-									<path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" />
-								</svg>
+								<div class="w-full h-full bg-elite-black flex items-center justify-center text-white font-black text-3xl">
+									{profile?.username?.charAt(0).toUpperCase()}
+								</div>
 							)}
-						</span>
-						<input type="file" name="avatar" accept="image/*" class="bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" />
+						</div>
+						<div class="flex-1">
+							<input type="file" name="avatar" id="avatar-input" accept="image/*" class="hidden" />
+							<label for="avatar-input" class="elite-button inline-block cursor-pointer text-xs">UPLOAD NEW DATA</label>
+							<p class="mt-3 text-[8px] font-mono font-bold text-elite-neutral-400 uppercase tracking-widest">JPG, PNG, GIF • MAX 2MB</p>
+						</div>
 					</div>
 				</div>
 
-				<div>
-					<label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-					<div class="mt-1">
-						<input type="text" name="username" id="username" value={profile?.username} required class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md px-3 py-2 border" />
-					</div>
+				<div class="space-y-4">
+					<label for="username" class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Identity Alias</label>
+					<input type="text" name="username" id="username" value={profile?.username} required class="w-full bg-elite-neutral-50 elite-border px-8 py-5 focus:bg-white focus:ring-12 focus:ring-elite-black/5 transition-all outline-none font-black text-xs uppercase tracking-tighter" />
 				</div>
 
-				<div>
-					<label for="bio" class="block text-sm font-medium text-gray-700">Bio</label>
-					<div class="mt-1">
-						<textarea id="bio" name="bio" rows="3" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border border-gray-300 rounded-md px-3 py-2">{profile?.bio}</textarea>
-					</div>
-					<p class="mt-2 text-sm text-gray-500">Brief description for your profile.</p>
+				<div class="space-y-4">
+					<label for="bio" class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Transmission Bio</label>
+					<textarea id="bio" name="bio" rows="4" class="w-full bg-elite-neutral-50 elite-border px-8 py-5 focus:bg-white focus:ring-12 focus:ring-elite-black/5 transition-all outline-none font-medium text-sm italic" placeholder="TELL THE NETWORK ABOUT YOURSELF...">{profile?.bio}</textarea>
 				</div>
 
-				<div class="flex justify-end gap-3">
-					<a href="/profile" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</a>
-					<button type="submit" class="bg-indigo-600 border border-transparent rounded-md shadow-sm py-2 px-4 inline-flex justify-center text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-						Save
+				<div class="pt-8 border-t border-elite-neutral-100 flex justify-end">
+					<button type="submit" class="elite-button bg-elite-black text-white text-lg py-5 px-12 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.2)] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-1 hover:-translate-y-1 transition-all">
+						COMMIT PROTOCOL CHANGES
 					</button>
 				</div>
 			</form>

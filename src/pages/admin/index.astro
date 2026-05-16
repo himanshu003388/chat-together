@@ -30,89 +30,87 @@ const { data: recentUsers } = await Astro.locals.supabase
 
 ---
 
-<Layout title="Admin Dashboard">
-  <div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-    <p class="text-gray-500 mt-1">Manage users and monitor application statistics.</p>
-  </div>
+<Layout title="Authority Command">
+  <div class="p-12">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-3 border-elite-black pb-12 mb-16">
+      <div>
+        <span class="text-[10px] font-black uppercase tracking-[0.3em] text-elite-neutral-400 mb-2 block">System Oversight</span>
+        <h1 class="text-6xl font-black text-elite-black tracking-tightest uppercase leading-none">Command Center</h1>
+      </div>
+    </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex items-center">
-        <div class="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-        </div>
-        <div>
-            <p class="text-sm font-medium text-gray-500">Total Users</p>
-            <p class="text-2xl font-bold text-gray-900">{userCount}</p>
-        </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+      <div class="elite-card bg-white flex items-center group">
+          <div class="w-16 h-16 elite-border flex items-center justify-center bg-elite-black text-white mr-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] group-hover:bg-white group-hover:text-elite-black transition-all">
+              <Users class="w-8 h-8" />
+          </div>
+          <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Total Nodes</p>
+              <p class="text-4xl font-black text-elite-black tracking-tighter leading-none">{userCount}</p>
+          </div>
+      </div>
+      <div class="elite-card bg-white flex items-center group">
+          <div class="w-16 h-16 elite-border flex items-center justify-center bg-elite-black text-white mr-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] group-hover:bg-white group-hover:text-elite-black transition-all">
+              <Hash class="w-8 h-8" />
+          </div>
+          <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Data Packets</p>
+              <p class="text-4xl font-black text-elite-black tracking-tighter leading-none">{messageCount}</p>
+          </div>
+      </div>
     </div>
-    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex items-center">
-        <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-        </div>
-        <div>
-            <p class="text-sm font-medium text-gray-500">Total Messages</p>
-            <p class="text-2xl font-bold text-gray-900">{messageCount}</p>
-        </div>
-    </div>
-  </div>
 
-  <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-    <div class="p-6 border-b border-gray-100 flex justify-between items-center">
-        <h2 class="text-lg font-semibold text-gray-900">Recent Users</h2>
-        <a href="/admin/users" class="text-sm text-indigo-600 font-medium hover:text-indigo-800">View All</a>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          {recentUsers?.map((u) => (
+    <div class="bg-white elite-border overflow-hidden shadow-[24px_24px_0px_0px_rgba(0,0,0,0.03)]">
+      <div class="p-8 border-b border-elite-black flex justify-between items-center bg-elite-neutral-50">
+          <h2 class="text-[10px] font-black uppercase tracking-[0.4em] text-elite-black">Recent Signal Activations</h2>
+          <a href="/admin/users" class="text-[10px] font-black uppercase underline hover:line-through">Access All Nodes</a>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-elite-black">
+          <thead class="bg-white">
             <tr>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center">
-                  <div class="flex-shrink-0 h-10 w-10">
-                    {u.avatar_url ? (
-                        <img class="h-10 w-10 rounded-full object-cover" src={u.avatar_url} alt="" />
-                    ) : (
-                        <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                            {u.username.charAt(0).toUpperCase()}
-                        </div>
-                    )}
-                  </div>
-                  <div class="ml-4">
-                    <div class="text-sm font-medium text-gray-900">{u.username}</div>
-                    <div class="text-sm text-gray-500">{u.email}</div>
-                  </div>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>
-                  {u.role}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {new Date(u.created_at).toLocaleDateString()}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.is_banned ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                  {u.is_banned ? 'Banned' : 'Active'}
-                </span>
-              </td>
+              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Node Identity</th>
+              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Auth Level</th>
+              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Activation</th>
+              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody class="bg-white divide-y divide-elite-neutral-100">
+            {recentUsers?.map((u) => (
+              <tr class="hover:bg-elite-neutral-50 transition-colors">
+                <td class="px-8 py-6 whitespace-nowrap">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 elite-border bg-elite-black text-white flex items-center justify-center font-black text-xs">
+                      {u.avatar_url ? (
+                          <img class="h-full w-full object-cover" src={u.avatar_url} alt="" />
+                      ) : (
+                          u.username.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div class="ml-4">
+                      <div class="text-[10px] font-black uppercase tracking-tightest">{u.username}</div>
+                      <div class="text-[8px] font-mono font-bold text-elite-neutral-400">{u.email}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-8 py-6 whitespace-nowrap">
+                  <span class={`elite-border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${u.role === 'admin' ? 'bg-elite-black text-white' : 'bg-white text-elite-black'}`}>
+                    {u.role}
+                  </span>
+                </td>
+                <td class="px-8 py-6 whitespace-nowrap text-[8px] font-mono font-bold uppercase text-elite-neutral-500">
+                  {new Date(u.created_at).toISOString().split('T')[0]}
+                </td>
+                <td class="px-8 py-6 whitespace-nowrap">
+                  <span class={`text-[8px] font-black uppercase tracking-[0.2em] ${u.is_banned ? 'text-red-600' : 'text-green-600'}`}>
+                    {u.is_banned ? 'TERMINATED' : 'PERSISTENT'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </Layout>

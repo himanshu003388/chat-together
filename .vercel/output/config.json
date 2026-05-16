@@ -44,6 +44,14 @@
 			"dest": "_render"
 		},
 		{
+			"src": "^/chat/rooms/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/chat/rooms/?$",
+			"dest": "_render"
+		},
+		{
 			"src": "^/chat/([^/]+?)/?$",
 			"dest": "_render"
 		},

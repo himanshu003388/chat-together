@@ -21,8 +21,8 @@ const { data: profiles } = await supabase
 
 ---
 
-<Layout title="Chat - ChatApp">
-	<div class="flex flex-1 h-[calc(100vh-64px)] overflow-hidden">
+<Layout title="Secure Channel">
+	<div class="flex flex-1 h-[calc(100vh-80px)] overflow-hidden">
 		<ChatApp
 			client:load
 			currentUser={{ id: user.id, email: user.email || '' }}

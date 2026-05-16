@@ -78,5 +78,5 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     }
   }
 
-  return redirect('/chat');
+  return redirect("/");
 };
