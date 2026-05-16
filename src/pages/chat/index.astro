@@ -12,7 +12,7 @@ const supabase = Astro.locals.supabase;
 
 const { data: profiles } = await supabase
   .from('profiles')
-  .select('id, username, avatar_url, last_seen, is_banned')
+  .select('id, username, avatar_url, last_seen, is_banned, bio, created_at')
   .neq('id', user.id)
   .order('last_seen', { ascending: false });
 
