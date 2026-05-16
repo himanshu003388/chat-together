@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabaseBrowser';
 import { ChatService } from '../services/chat.service';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Send, User, MoreVertical, Check, CheckCheck, Phone, Video, Paperclip, X, FileText, Download } from 'lucide-react';
+import { Search, Send, User, MoreVertical, Check, CheckCheck, Phone, Video, Paperclip, X, FileText, Download, ChevronLeft, MessageCircle, Calendar } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -46,6 +46,8 @@ export default function ChatApp({
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState<Profile | null>(null);
+  const [showMobileList, setShowMobileList] = useState(true);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -196,8 +198,8 @@ export default function ChatApp({
 
   return (
     <div className="flex w-full h-full bg-surface-primary overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-80 bg-surface-secondary border-r border-white/5 flex flex-col">
+      {/* Sidebar - hidden on mobile when chat is open */}
+      <div className={`${showMobileList || !activeUserId ? 'w-full md:w-80' : 'hidden'} bg-surface-secondary border-r border-white/5 flex flex-col`}>
         <div className="p-4 border-b border-white/5">
           <h2 className="text-xl font-bold mb-4">Direct Nodes</h2>
           <div className="relative">
@@ -207,13 +209,15 @@ export default function ChatApp({
         </div>
         <div className="flex-1 overflow-y-auto">
           {filteredProfiles.map((p) => (
-            <button key={p.id} onClick={() => setActiveUserId(p.id)} className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-all border-b border-white/5 ${activeUserId === p.id ? 'bg-white/10' : ''}`}>
+            <button key={p.id} onClick={() => { setActiveUserId(p.id); setShowMobileList(false); }} className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-all border-b border-white/5 ${activeUserId === p.id ? 'bg-white/10' : ''}`}>
               <div className="relative">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold">{p.username[0].toUpperCase()}</div>
+                <button onClick={(e) => { e.stopPropagation(); setShowProfileModal(p); }} className="w-12 h-12 rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold hover:ring-2 hover:ring-accent-cyan/50 transition-all">
+                  {p.username[0].toUpperCase()}
+                </button>
                 {isOnline(p.last_seen) && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-accent-emerald rounded-full border-2 border-surface-secondary"></div>}
               </div>
               <div className="flex-1 text-left">
-                <div className="font-bold text-sm">{p.username}</div>
+                <button onClick={(e) => { e.stopPropagation(); setShowProfileModal(p); }} className="font-bold text-sm hover:text-accent-cyan transition-colors">{p.username}</button>
                 <div className="text-[10px] uppercase tracking-widest text-white/30">{isOnline(p.last_seen) ? 'Active' : 'Offline'}</div>
               </div>
             </button>
@@ -227,13 +231,16 @@ export default function ChatApp({
           <>
             <div className="p-4 border-b border-white/5 glass flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold">{activeUserProfile.username[0].toUpperCase()}</div>
+                <button onClick={() => setShowProfileModal(activeUserProfile)} className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold hover:ring-2 hover:ring-accent-cyan/50 transition-all">
+                  {activeUserProfile.username[0].toUpperCase()}
+                </button>
                 <div>
-                  <h3 className="font-bold">{activeUserProfile.username}</h3>
+                  <button onClick={() => setShowProfileModal(activeUserProfile)} className="font-bold hover:text-accent-cyan transition-colors">{activeUserProfile.username}</button>
                   <p className="text-[10px] text-white/40 uppercase tracking-widest">{isOnline(activeUserProfile.last_seen) ? 'Link Established' : 'Signal Lost'}</p>
                 </div>
               </div>
               <div className="flex gap-2">
+                <button onClick={() => { setShowMobileList(true); setActiveUserId(null); }} className="md:hidden p-2.5 rounded-xl hover:bg-white/10 text-white/60"><ChevronLeft className="w-5 h-5" /></button>
                 <button className="p-2.5 rounded-xl hover:bg-white/10 text-white/60"><Phone className="w-5 h-5" /></button>
                 <button className="p-2.5 rounded-xl hover:bg-white/10 text-white/60"><Video className="w-5 h-5" /></button>
               </div>
@@ -310,6 +317,32 @@ export default function ChatApp({
           </div>
         )}
       </div>
+
+      {/* Profile Modal */}
+      <AnimatePresence>
+        {showProfileModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowProfileModal(null)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-surface-secondary border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold text-2xl mb-4">
+                  {showProfileModal.username[0].toUpperCase()}
+                </div>
+                <h2 className="text-xl font-bold mb-1">{showProfileModal.username}</h2>
+                <p className="text-[10px] uppercase tracking-widest text-white/40 mb-4">{isOnline(showProfileModal.last_seen) ? 'Online' : 'Offline'}</p>
+                {showProfileModal.bio && <p className="text-sm text-white/60 mb-4">{showProfileModal.bio}</p>}
+                <p className="text-[10px] text-white/30 mb-6">Joined {showProfileModal.created_at ? new Date(showProfileModal.created_at).toLocaleDateString() : 'recently'}</p>
+                <div className="flex gap-3">
+                  <button onClick={() => { setShowProfileModal(null); setActiveUserId(showProfileModal.id); setShowMobileList(false); }} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-accent-cyan to-accent-blue text-white font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-accent-cyan/20 transition-all">
+                    <MessageCircle className="w-4 h-4" />
+                    Message
+                  </button>
+                  <button onClick={() => setShowProfileModal(null)} className="px-4 py-3 rounded-xl border border-white/10 hover:bg-white/5 transition-all">Close</button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
