@@ -92,8 +92,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
         }
       }
 
-      // Admin route protection - don't block access, let page handle it
-      // This allows the admin page to show its own redirect if needed
+      // Admin route protection - check if user is admin, if not redirect
+      if (url.pathname.startsWith("/admin") && profile?.role !== 'admin') {
+        return context.redirect("/");
+      }
     } catch (err) {
       logger.error({ err }, 'Profile processing error');
     }
