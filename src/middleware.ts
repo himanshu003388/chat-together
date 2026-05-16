@@ -72,16 +72,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
       locals.profile = profile;
 
       // Banned user check
-      if (currentProfile?.is_banned && isProtectedRoute) {
+      if (profile?.is_banned && isProtectedRoute) {
         if (!url.pathname.includes('/api/auth/signout')) {
           return context.redirect("/?error=Your account is banned");
         }
       }
 
-      // Admin route protection
-      if (url.pathname.startsWith("/admin") && currentProfile?.role !== 'admin') {
-        return context.redirect("/");
-      }
+      // Admin route protection - don't block access, let page handle it
+      // This allows the admin page to show its own redirect if needed
     } catch (err) {
       logger.error({ err }, 'Profile processing error');
     }
