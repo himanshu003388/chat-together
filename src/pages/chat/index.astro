@@ -4,28 +4,35 @@ import ChatApp from '../../components/ChatApp';
 
 const user = Astro.locals.user;
 
-// Protected route - user must exist due to middleware
 if (!user) {
   return Astro.redirect('/login');
 }
 
 const supabase = Astro.locals.supabase;
 
-// Fetch all profiles for the sidebar
 const { data: profiles } = await supabase
   .from('profiles')
   .select('id, username, avatar_url, last_seen, is_banned')
-  .neq('id', user.id) // Exclude self
+  .neq('id', user.id)
   .order('last_seen', { ascending: false });
+
+const profile = await supabase
+  .from('profiles')
+  .select('username')
+  .eq('id', user.id)
+  .single();
 
 ---
 
-<Layout title="Chat - ChatApp">
+<Layout title="Messages">
 	<div class="flex flex-1 h-[calc(100vh-64px)] overflow-hidden">
-		<!-- React Component to handle realtime chat -->
 		<ChatApp
 			client:load
-			currentUser={{ id: user.id, email: user.email || '' }}
+			currentUser={{
+        id: user.id,
+        email: user.email || '',
+        username: profile.data?.username
+      }}
 			initialProfiles={profiles || []}
 		/>
 	</div>

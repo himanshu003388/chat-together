@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseBrowser';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Send, User, Hash, MoreVertical, Check, CheckCheck } from 'lucide-react';
+import { Search, Send, User, MoreVertical, Check, CheckCheck, Phone, Video } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -9,6 +9,7 @@ interface Profile {
   avatar_url: string | null;
   last_seen: string | null;
   is_banned: boolean;
+  bio?: string;
 }
 
 interface Message {
@@ -18,10 +19,11 @@ interface Message {
   content: string;
   created_at: string;
   is_read?: boolean;
+  file_url?: string;
 }
 
 interface ChatAppProps {
-  currentUser: { id: string; email: string };
+  currentUser: { id: string; email: string; username?: string };
   initialProfiles: Profile[];
   initialActiveUserId?: string;
 }
@@ -39,12 +41,16 @@ export default function ChatApp({
   const [isTyping, setIsTyping] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [activeUserProfile, setActiveUserProfile] = useState<Profile | null>(null);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Filter profiles by search
   const filteredProfiles = profiles.filter((p) =>
-    p.username.toLowerCase().includes(searchQuery.toLowerCase())
+    p.username.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    !p.is_banned
   );
 
   // Get active user profile
@@ -52,42 +58,41 @@ export default function ChatApp({
     if (activeUserId) {
       const profile = profiles.find((p) => p.id === activeUserId);
       setActiveUserProfile(profile || null);
+    } else {
+      setActiveUserProfile(null);
     }
   }, [activeUserId, profiles]);
 
-  // Fetch messages when active user changes
+  // Real-time channel setup
   useEffect(() => {
-    if (activeUserId) {
-      fetchMessages();
+    // Clean up previous channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
     }
-  }, [activeUserId]);
 
-  // Subscribe to realtime messages
-  useEffect(() => {
+    if (!activeUserId) return;
+
+    // Create new channel for this conversation
     const channel = supabase
-      .channel('messages-realtime')
+      .channel(`chat-${activeUserId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
+          filter: `receiver_id=eq.${currentUser.id}`,
         },
         async (payload) => {
           const newMsg = payload.new as Message;
-          if (
-            (newMsg.sender_id === currentUser.id && newMsg.receiver_id === activeUserId) ||
-            (newMsg.sender_id === activeUserId && newMsg.receiver_id === currentUser.id)
-          ) {
+          // Only add if from active user
+          if (newMsg.sender_id === activeUserId) {
             setMessages((prev) => [...prev, newMsg]);
-            
-            // If we are the receiver and chat is active, mark as read
-            if (newMsg.receiver_id === currentUser.id) {
-              await supabase
-                .from('messages')
-                .update({ is_read: true })
-                .eq('id', newMsg.id);
-            }
+            // Mark as read
+            await supabase
+              .from('messages')
+              .update({ is_read: true })
+              .eq('id', newMsg.id);
           }
         }
       )
@@ -100,23 +105,25 @@ export default function ChatApp({
         },
         (payload) => {
           const updatedMsg = payload.new as Message;
-          setMessages((prev) => 
-            prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m)
+          setMessages((prev) =>
+            prev.map((m) => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m)
           );
         }
       )
       .subscribe();
+
+    channelRef.current = channel;
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [activeUserId, currentUser.id]);
 
-  // Subscribe to typing status
+  // Typing indicator channel
   useEffect(() => {
     if (!activeUserId) return;
 
-    const channel = supabase
+    const typingChannel = supabase
       .channel(`typing-${activeUserId}`)
       .on('broadcast', { event: 'typing' }, (payload) => {
         if (payload.payload.userId === activeUserId) {
@@ -126,14 +133,14 @@ export default function ChatApp({
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(typingChannel);
     };
   }, [activeUserId]);
 
-  // Subscribe to profile updates
+  // Profile updates listener
   useEffect(() => {
-    const channel = supabase
-      .channel('profiles-realtime')
+    const profileChannel = supabase
+      .channel('profiles-updates')
       .on(
         'postgres_changes',
         {
@@ -148,9 +155,23 @@ export default function ChatApp({
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(profileChannel);
     };
   }, []);
+
+  // Update last seen on mount and unmount
+  useEffect(() => {
+    updateLastSeen();
+    const interval = setInterval(updateLastSeen, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const updateLastSeen = async () => {
+    await supabase
+      .from('profiles')
+      .update({ last_seen: new Date().toISOString() })
+      .eq('id', currentUser.id);
+  };
 
   const fetchProfiles = async () => {
     const { data } = await supabase
@@ -161,42 +182,59 @@ export default function ChatApp({
     if (data) setProfiles(data);
   };
 
-  const fetchMessages = async () => {
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
-      .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeUserId}),and(sender_id.eq.${activeUserId},receiver_id.eq.${currentUser.id})`)
-      .order('created_at', { ascending: true });
-    
-    if (data) {
-      setMessages(data);
-      
+  const fetchMessages = useCallback(async () => {
+    if (!activeUserId) return;
+    setLoadingMessages(true);
+
+    try {
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeUserId}),and(sender_id.eq.${activeUserId},receiver_id.eq.${currentUser.id})`)
+        .order('created_at', { ascending: true });
+
+      if (data) {
+        setMessages(data);
+      }
+
       // Mark messages as read
-      const unreadIds = data
-        .filter(m => m.receiver_id === currentUser.id && !m.is_read)
-        .map(m => m.id);
-        
-      if (unreadIds.length > 0) {
+      const unreadMessages = data?.filter(
+        (m) => m.receiver_id === currentUser.id && !m.is_read
+      );
+
+      if (unreadMessages && unreadMessages.length > 0) {
         await supabase
           .from('messages')
           .update({ is_read: true })
-          .in('id', unreadIds);
+          .in('id', unreadMessages.map((m) => m.id));
       }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      setLoadingMessages(false);
     }
-  };
+  }, [activeUserId, currentUser.id]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  };
-
+  // Fetch messages when active user changes
   useEffect(() => {
-    scrollToBottom();
+    if (activeUserId) {
+      fetchMessages();
+    } else {
+      setMessages([]);
+    }
+  }, [activeUserId, fetchMessages]);
+
+  // Scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, otherUserTyping]);
 
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value);
 
-    // Broadcast typing status
+    if (!activeUserId) return;
+
+    // Send typing indicator
     supabase.channel(`typing-${activeUserId}`).send({
       type: 'broadcast',
       event: 'typing',
@@ -215,17 +253,17 @@ export default function ChatApp({
         event: 'typing',
         payload: { userId: currentUser.id, typing: false },
       });
-    }, 2000);
+    }, 1500);
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !activeUserId) return;
+    if (!newMessage.trim() || !activeUserId || sendingMessage) return;
 
-    const content = newMessage;
-    setNewMessage('');
+    const content = newMessage.trim();
+    setSendingMessage(true);
 
-    // Stop typing
+    // Stop typing indicator
     supabase.channel(`typing-${activeUserId}`).send({
       type: 'broadcast',
       event: 'typing',
@@ -234,23 +272,34 @@ export default function ChatApp({
 
     // Optimistic update
     const tempMsg: Message = {
-      id: crypto.randomUUID(),
+      id: `temp-${Date.now()}`,
       sender_id: currentUser.id,
       receiver_id: activeUserId,
       content,
       created_at: new Date().toISOString(),
+      is_read: false,
     };
+
     setMessages((prev) => [...prev, tempMsg]);
+    setNewMessage('');
 
-    const { error } = await supabase.from('messages').insert({
-      sender_id: currentUser.id,
-      receiver_id: activeUserId,
-      content,
-    });
+    try {
+      const { error } = await supabase.from('messages').insert({
+        sender_id: currentUser.id,
+        receiver_id: activeUserId,
+        content,
+      });
 
-    if (error) {
-      console.error('Error sending message:', error);
+      if (error) {
+        console.error('Error sending message:', error);
+        // Remove optimistic message on error
+        setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
+      }
+    } catch (error) {
+      console.error('Error:', error);
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -260,217 +309,240 @@ export default function ChatApp({
     return diff < 5 * 60 * 1000; // 5 minutes
   };
 
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+
+    if (isToday) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
   return (
-    <div className="flex w-full h-full bg-white elite-border m-6 overflow-hidden">
+    <div className="flex w-full h-full bg-surface-primary overflow-hidden">
       {/* Sidebar */}
-      <div className="w-96 bg-white border-r border-elite-black flex flex-col">
-        <div className="p-8 border-b border-elite-black">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-black tracking-tightest uppercase">Inbox</h2>
-            <div className="w-8 h-8 elite-border flex items-center justify-center font-bold text-xs bg-elite-black text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)]">
+      <div className="w-80 bg-surface-secondary border-r border-white/5 flex flex-col">
+        <div className="p-4 border-b border-white/5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">Messages</h2>
+            <div className="w-8 h-8 rounded-lg bg-accent-cyan/20 flex items-center justify-center text-sm font-medium text-accent-cyan">
               {filteredProfiles.length}
             </div>
           </div>
           <div className="relative">
             <label htmlFor="user-search" className="sr-only">Search</label>
-            <div className="absolute left-4 top-1/2 -translate-y-1/2">
-              <Search className="w-4 h-4 text-elite-neutral-400" />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+              <Search className="w-4 h-4 text-white/40" />
             </div>
             <input
               id="user-search"
               type="text"
-              placeholder="SEARCH USERS..."
+              placeholder="Search users..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-elite-neutral-50 elite-border pl-10 pr-4 py-3 text-[10px] font-black uppercase tracking-widest focus:bg-white focus:ring-4 focus:ring-elite-black/5 transition-all outline-none"
+              className="input-glass text-sm pl-9 py-2.5"
             />
           </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto divide-y divide-elite-neutral-100">
-          <AnimatePresence initial={false}>
-            {filteredProfiles.map((profile, idx) => (
-              <motion.button
-                key={profile.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05, ease: [0.16, 1, 0.3, 1] }}
-                onClick={() => setActiveUserId(profile.id)}
-                aria-selected={activeUserId === profile.id}
-                role="tab"
-                className={`w-full p-6 flex items-center gap-4 transition-all group relative overflow-hidden ${
-                  activeUserId === profile.id ? 'bg-elite-black text-white' : 'hover:bg-elite-neutral-50'
-                }`}
-              >
-                {activeUserId === profile.id && (
-                  <motion.div layoutId="sidebar-active" className="absolute inset-0 bg-elite-black -z-10" />
-                )}
-                <div className="relative flex-shrink-0">
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt=""
-                      className={`w-12 h-12 elite-border object-cover ${activeUserId === profile.id ? 'border-white' : 'border-elite-black'}`}
-                    />
-                  ) : (
-                    <div className={`w-12 h-12 elite-border flex items-center justify-center font-black text-sm ${activeUserId === profile.id ? 'bg-white text-elite-black border-white' : 'bg-elite-black text-white border-elite-black'}`}>
-                      {profile.username.slice(0, 2).toUpperCase()}
+
+        <div className="flex-1 overflow-y-auto">
+          <AnimatePresence>
+            {filteredProfiles.length === 0 ? (
+              <div className="p-8 text-center">
+                <User className="w-12 h-12 text-white/20 mx-auto mb-3" />
+                <p className="text-white/40 text-sm">No users found</p>
+              </div>
+            ) : (
+              filteredProfiles.map((profile, idx) => (
+                <motion.button
+                  key={profile.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.03 }}
+                  onClick={() => setActiveUserId(profile.id)}
+                  className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-all border-b border-white/5 ${
+                    activeUserId === profile.id ? 'bg-white/10' : ''
+                  }`}
+                >
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center text-lg font-medium">
+                      {profile.username[0].toUpperCase()}
                     </div>
-                  )}
-                  {isOnline(profile.last_seen) && (
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 elite-border border-2 border-white rounded-full shadow-sm"></span>
-                  )}
-                </div>
-                <div className="flex-1 text-left min-w-0">
-                  <div className="flex justify-between items-baseline mb-0.5">
-                    <p className="font-black text-sm uppercase tracking-tighter truncate">{profile.username}</p>
-                    <span className={`text-[8px] font-mono font-bold ${activeUserId === profile.id ? 'text-elite-neutral-400' : 'text-elite-neutral-500'}`}>
-                      {isOnline(profile.last_seen) ? 'LIVE' : 'OFFLINE'}
-                    </span>
+                    {isOnline(profile.last_seen) && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-accent-emerald rounded-full border-2 border-surface-secondary"></div>
+                    )}
                   </div>
-                  <p className={`text-[10px] font-medium truncate ${activeUserId === profile.id ? 'text-elite-neutral-400' : 'text-elite-neutral-500'}`}>
-                    Click to open secure channel
-                  </p>
-                </div>
-              </motion.button>
-            ))}
+                  <div className="flex-1 text-left">
+                    <div className="font-medium">{profile.username}</div>
+                    <div className="text-xs text-white/40">
+                      {isOnline(profile.last_seen) ? 'Online' : 'Offline'}
+                    </div>
+                  </div>
+                </motion.button>
+              ))
+            )}
           </AnimatePresence>
-          {filteredProfiles.length === 0 && (
-            <div className="p-12 text-center">
-              <p className="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">No signals found</p>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col">
         {activeUserId && activeUserProfile ? (
           <>
             {/* Chat Header */}
-            <div className="h-20 border-b border-elite-black px-8 flex items-center justify-between bg-white z-10">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 elite-border flex items-center justify-center font-black bg-elite-neutral-50">
-                  {activeUserProfile.username.slice(0, 1).toUpperCase()}
+            <div className="p-4 border-b border-white/5 glass flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-sm font-medium">
+                    {activeUserProfile.username[0].toUpperCase()}
+                  </div>
+                  {isOnline(activeUserProfile.last_seen) && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-accent-emerald rounded-full border-2 border-surface-primary"></div>
+                  )}
                 </div>
                 <div>
-                  <h3 className="font-black text-sm uppercase tracking-tighter">{activeUserProfile.username}</h3>
-                  <div className="flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${isOnline(activeUserProfile.last_seen) ? 'bg-green-500' : 'bg-elite-neutral-300'}`}></span>
-                    <span className="text-[9px] font-mono font-bold text-elite-neutral-500 uppercase">
-                      {isOnline(activeUserProfile.last_seen) ? 'Connection Established' : 'Offline Mode'}
-                    </span>
-                  </div>
+                  <h3 className="font-semibold">{activeUserProfile.username}</h3>
+                  <p className="text-xs text-white/40">
+                    {isOnline(activeUserProfile.last_seen) ? 'Online' : 'Last seen ' + formatTime(activeUserProfile.last_seen || '')}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-2 hover:bg-elite-neutral-100 elite-border transition-colors">
-                  <Search className="w-4 h-4" />
+                <button className="p-2.5 rounded-xl hover:bg-white/10 transition-all">
+                  <Phone className="w-5 h-5 text-white/60" />
                 </button>
-                <button className="p-2 hover:bg-elite-neutral-100 elite-border transition-colors">
-                  <MoreVertical className="w-4 h-4" />
+                <button className="p-2.5 rounded-xl hover:bg-white/10 transition-all">
+                  <Video className="w-5 h-5 text-white/60" />
+                </button>
+                <button className="p-2.5 rounded-xl hover:bg-white/10 transition-all">
+                  <MoreVertical className="w-5 h-5 text-white/60" />
                 </button>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-white selection:bg-elite-black selection:text-white" role="log" aria-live="polite">
-              <AnimatePresence mode="popLayout">
-                {messages.map((msg, idx) => {
-                  const isMe = msg.sender_id === currentUser.id;
-                  return (
-                    <motion.div
-                      key={msg.id}
-                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
-                      className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[65%]`}>
-                        <div
-                          className={`elite-border px-5 py-3.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${
-                            isMe
-                              ? 'bg-elite-black text-white border-elite-black'
-                              : 'bg-white text-elite-black border-elite-black'
-                          }`}
-                        >
-                          <p className="text-sm font-medium leading-relaxed tracking-tight">{msg.content}</p>
-                        </div>
-                        <div className="flex items-center gap-2 mt-3">
-                          <span className="text-[9px] font-mono font-bold text-elite-neutral-400 uppercase tracking-tighter">
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                          </span>
-                          {isMe && (
-                            <span className="flex items-center">
-                              {msg.is_read ? (
-                                <CheckCheck className="w-3 h-3 text-elite-black" strokeWidth={3} />
-                              ) : (
-                                <Check className="w-3 h-3 text-elite-neutral-300" strokeWidth={3} />
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-              {otherUserTyping && (
-                <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex justify-start"
-                >
-                  <div className="bg-elite-neutral-50 elite-border px-4 py-2 flex gap-3 items-center">
-                    <div className="flex gap-1">
-                      <span className="w-1 h-1 bg-elite-black rounded-full animate-bounce"></span>
-                      <span className="w-1 h-1 bg-elite-black rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                      <span className="w-1 h-1 bg-elite-black rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-elite-neutral-500">Signal Incoming...</span>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4" role="log" aria-live="polite">
+              {loadingMessages ? (
+                <div className="flex flex-col items-center justify-center h-full gap-4">
+                  <div className="w-10 h-10 border-2 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin"></div>
+                  <span className="text-sm text-white/40">Loading messages...</span>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-4">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center">
+                    <User className="w-10 h-10 text-white/30" />
                   </div>
-                </motion.div>
+                  <p className="text-white/40 text-sm">No messages yet. Start the conversation!</p>
+                </div>
+              ) : (
+                <AnimatePresence>
+                  {messages.map((msg, idx) => {
+                    const isMe = msg.sender_id === currentUser.id;
+                    const showDate = idx === 0 ||
+                      new Date(messages[idx - 1].created_at).toDateString() !== new Date(msg.created_at).toDateString();
+
+                    return (
+                      <React.Fragment key={msg.id}>
+                        {showDate && (
+                          <div className="flex justify-center">
+                            <span className="text-xs text-white/30 px-3 py-1 rounded-full bg-white/5">
+                              {new Date(msg.created_at).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
+                            </span>
+                          </div>
+                        )}
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div className={`max-w-[70%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
+                            <div className={`rounded-2xl px-4 py-3 ${
+                              isMe
+                                ? 'bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary'
+                                : 'bg-surface-elevated border border-white/10'
+                            }`}>
+                              <p className="text-sm leading-relaxed">{msg.content}</p>
+                            </div>
+                            <div className={`flex items-center gap-1 mt-1 ${isMe ? 'justify-end' : ''}`}>
+                              <span className="text-xs text-white/30 font-mono">
+                                {formatTime(msg.created_at)}
+                              </span>
+                              {isMe && (
+                                msg.is_read ? (
+                                  <CheckCheck className="w-3.5 h-3.5 text-accent-cyan" />
+                                ) : (
+                                  <Check className="w-3.5 h-3.5 text-white/30" />
+                                )
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      </React.Fragment>
+                    );
+                  })}
+                </AnimatePresence>
               )}
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Typing Indicator */}
+            {otherUserTyping && (
+              <div className="px-4 py-2">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 text-white/40 text-sm"
+                >
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                  <span>{activeUserProfile.username} is typing...</span>
+                </motion.div>
+              </div>
+            )}
+
             {/* Message Input */}
-            <div className="p-8 bg-white border-t border-elite-black">
-              <form onSubmit={handleSendMessage} className="flex gap-4 items-end">
-                <div className="flex-1 relative group">
-                  <label htmlFor="message-input" className="sr-only">Input Signal</label>
+            <div className="p-4 border-t border-white/5">
+              <form onSubmit={handleSendMessage} className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <label htmlFor="message-input" className="sr-only">Message</label>
                   <input
                     id="message-input"
                     type="text"
                     value={newMessage}
                     onChange={handleTyping}
-                    placeholder="TYPE SIGNAL..."
-                    className="w-full bg-elite-neutral-50 elite-border px-6 py-4 focus:bg-white focus:ring-8 focus:ring-elite-black/5 transition-all outline-none text-sm font-bold tracking-tight uppercase"
+                    placeholder="Type a message..."
+                    className="input-glass"
+                    disabled={sendingMessage}
                   />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-focus-within:opacity-100 transition-opacity">
-                    <span className="text-[8px] font-mono font-bold text-elite-neutral-400 uppercase tracking-widest">Secure Channel</span>
-                  </div>
                 </div>
                 <button
                   type="submit"
-                  disabled={!newMessage.trim()}
-                  aria-label="Send signal"
-                  className="elite-button !h-14 !w-14 !p-0 flex items-center justify-center disabled:opacity-20 disabled:grayscale transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+                  disabled={!newMessage.trim() || sendingMessage}
+                  className="p-3 rounded-xl bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary font-medium hover:shadow-glow-cyan transition-all disabled:opacity-50"
                 >
-                  <Send className="w-5 h-5" />
+                  {sendingMessage ? (
+                    <div className="w-5 h-5 border-2 border-surface-primary/30 border-t-surface-primary rounded-full animate-spin"></div>
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
                 </button>
               </form>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-elite-neutral-50/20 p-12">
-            <div className="w-24 h-24 elite-border flex items-center justify-center mb-8 bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-              <Hash className="w-12 h-12 text-elite-black" />
+          /* No user selected */
+          <div className="flex-1 flex flex-col items-center justify-center gap-4">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center">
+              <User className="w-12 h-12 text-white/30" />
             </div>
-            <h2 className="text-2xl font-black uppercase tracking-tightest mb-2">Secure Terminal</h2>
-            <p className="text-[10px] font-bold text-elite-neutral-400 uppercase tracking-[0.2em] animate-pulse text-center max-w-xs">
-              Waiting for connection. Select a profile to establish an encrypted signal.
-            </p>
+            <h3 className="text-xl font-semibold">Select a conversation</h3>
+            <p className="text-white/40 text-sm">Choose a user from the sidebar to start chatting</p>
           </div>
         )}
       </div>
