@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import GeneralChat from '../components/GeneralChat';
+import ThreeBackground from '../components/ThreeBackground';
 
 const user = Astro.locals.user;
 const profile = Astro.locals.profile;
@@ -10,9 +11,8 @@ const error = Astro.url.searchParams.get('error');
 
 <Layout title="ChatTogether">
 	{user ? (
-		<div class="h-[calc(100vh-64px)] flex flex-col bg-surface-primary">
-			{/* Main Content - just the chat component, nav is in Layout */}
-			<div class="flex-1 overflow-y-auto">
+		<div class="h-[calc(100vh-64px)] flex flex-col bg-surface-primary/20 relative">
+			<div class="flex-1 overflow-hidden relative z-10">
 				<GeneralChat
 					client:load
 					currentUser={{
@@ -25,104 +25,110 @@ const error = Astro.url.searchParams.get('error');
 		</div>
 	) : (
 		<div class="min-h-screen bg-surface-primary flex flex-col relative overflow-hidden">
-			{/* Animated Background */}
-			<div class="fixed inset-0 pointer-events-none">
-				<div class="absolute inset-0 bg-gradient-to-br from-surface-primary via-surface-secondary to-surface-primary"></div>
-				<div class="absolute top-0 -left-40 w-96 h-96 bg-accent-cyan/20 rounded-full blur-3xl animate-pulse-slow"></div>
-				<div class="absolute bottom-0 -right-40 w-96 h-96 bg-accent-purple/20 rounded-full blur-3xl animate-pulse-slow" style="animation-delay: 2s;"></div>
-				<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent-pink/5 rounded-full blur-3xl animate-float"></div>
-			</div>
+			<ThreeBackground client:load />
 
-			<div class="max-w-7xl mx-auto px-8 pt-24 pb-16 relative z-10 flex-1 flex flex-col">
+			<div class="max-w-7xl mx-auto px-8 pt-32 pb-16 relative z-10 flex-1 flex flex-col">
 				{error && (
-					<div class="max-w-md mb-12 glass-card border-red-500/30 p-6">
+					<div class="max-w-md mx-auto mb-12 glass-card border-red-500/30 p-6 animate-in">
 						<div class="flex items-center gap-4">
-							<div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+							<div class="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
 								<svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 								</svg>
 							</div>
 							<div>
-								<p class="text-sm font-medium text-red-400">Error</p>
-								<p class="text-xs text-white/60">{error}</p>
+								<p class="text-sm font-bold text-red-400 uppercase tracking-tighter">System Alert</p>
+								<p class="text-xs text-white/60 font-mono">{error}</p>
 							</div>
 						</div>
 					</div>
 				)}
 
 				{/* Hero Section */}
-				<div class="max-w-4xl mx-auto text-center py-20">
-					<div class="inline-flex items-center gap-3 glass px-4 py-2 rounded-full mb-8">
-						<span class="w-2 h-2 rounded-full bg-accent-cyan animate-pulse"></span>
-						<span class="text-sm font-medium text-white/80">Real-time messaging</span>
+				<div class="max-w-4xl mx-auto text-center py-20 relative">
+					<div class="inline-flex items-center gap-3 glass-dark border-accent-cyan/20 px-5 py-2.5 rounded-full mb-10 animate-in hover:border-accent-cyan/50 transition-colors">
+						<span class="w-2 h-2 rounded-full bg-accent-cyan animate-pulse shadow-[0_0_10px_rgba(0,212,255,1)]"></span>
+						<span class="text-[10px] font-bold text-white/70 uppercase tracking-[0.3em]">Quantum Protocol Active</span>
 					</div>
 
-					<h1 class="text-6xl md:text-7xl font-bold mb-8 leading-tight">
-						<span class="text-white">Connect</span>
-						<span class="gradient-text"> instantly</span>
+					<h1 class="text-7xl md:text-8xl font-black mb-10 leading-[0.9] tracking-tighter uppercase italic animate-in stagger-1">
+						<span class="text-white drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)]">Connect</span><br/>
+						<span class="gradient-text drop-shadow-[0_0_30px_rgba(0,212,255,0.3)]"> Instantly.</span>
 					</h1>
 
-					<p class="text-xl text-white/60 max-w-2xl mx-auto mb-12 leading-relaxed">
-						Experience seamless communication with your community. Fast, secure, and beautifully designed.
+					<p class="text-xl text-white/50 max-w-2xl mx-auto mb-14 leading-relaxed font-medium animate-in stagger-2">
+						Experience the next generation of secure, real-time messaging. Engineered for performance, designed for the future.
 					</p>
 
 					{/* CTA Buttons */}
-					<div class="flex flex-col sm:flex-row gap-4 justify-center mb-20">
-						<a href="/signup" class="btn-primary text-lg !px-10 !py-4">
-							Start Chatting
+					<div class="flex flex-col sm:flex-row gap-6 justify-center items-center mb-24 animate-in stagger-3">
+						<a href="/signup" class="btn-primary text-base !px-12 !py-5 !rounded-2xl group">
+							<span class="flex items-center gap-3">
+								INITIALIZE LINK
+								<svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+								</svg>
+							</span>
 						</a>
-						<a href="/login" class="btn-secondary text-lg !px-10 !py-4">
-							Welcome Back
+						<a href="/login" class="px-10 py-5 rounded-2xl border border-white/10 text-white/60 hover:bg-white/5 transition-all text-sm font-bold tracking-widest hover:text-white uppercase">
+							ACCESS_PORTAL
 						</a>
 					</div>
 				</div>
 
-				{/* Features Grid */}
-				<div class="grid md:grid-cols-3 gap-6 mt-auto">
-					<div class="glass-card group hover:border-accent-cyan/30 transition-all duration-300 p-8">
-						<div class="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-cyan/20 to-accent-cyan/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-							<svg class="w-7 h-7 text-accent-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				{/* Tech Specs Grid */}
+				<div class="grid md:grid-cols-3 gap-8 mt-auto animate-in stagger-4">
+					<div class="glass-card group hover:border-accent-cyan/40 transition-all duration-500 p-10 relative overflow-hidden">
+						<div class="absolute -top-10 -right-10 w-32 h-32 bg-accent-cyan/5 blur-3xl group-hover:bg-accent-cyan/10 transition-colors" />
+						<div class="w-16 h-16 rounded-2xl bg-surface-elevated border border-white/5 flex items-center justify-center mb-8 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-xl">
+							<svg class="w-8 h-8 text-accent-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
 							</svg>
 						</div>
-						<h3 class="text-xl font-bold mb-3">Lightning Fast</h3>
-						<p class="text-white/50 text-sm leading-relaxed">
-							Instant message delivery with real-time synchronization across all devices.
+						<h3 class="text-2xl font-bold mb-4 tracking-tight uppercase italic">Ultra-Low Latency</h3>
+						<p class="text-white/40 text-sm leading-relaxed font-mono">
+							Real-time synchronization powered by advanced WebSocket clusters. sub-100ms transmission guaranteed.
 						</p>
 					</div>
 
-					<div class="glass-card group hover:border-accent-purple/30 transition-all duration-300 p-8">
-						<div class="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-purple/20 to-accent-purple/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-							<svg class="w-7 h-7 text-accent-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<div class="glass-card group hover:border-accent-purple/40 transition-all duration-500 p-10 relative overflow-hidden">
+						<div class="absolute -top-10 -right-10 w-32 h-32 bg-accent-purple/5 blur-3xl group-hover:bg-accent-purple/10 transition-colors" />
+						<div class="w-16 h-16 rounded-2xl bg-surface-elevated border border-white/5 flex items-center justify-center mb-8 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-xl">
+							<svg class="w-8 h-8 text-accent-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
 							</svg>
 						</div>
-						<h3 class="text-xl font-bold mb-3">End-to-End Encrypted</h3>
-						<p class="text-white/50 text-sm leading-relaxed">
-							Your conversations are secured with industry-leading encryption protocols.
+						<h3 class="text-2xl font-bold mb-4 tracking-tight uppercase italic">Secure Uplink</h3>
+						<p class="text-white/40 text-sm leading-relaxed font-mono">
+							Military-grade E2E encryption using RSA-4096 and AES-256 standards. Your data remains your own.
 						</p>
 					</div>
 
-					<div class="glass-card group hover:border-accent-pink/30 transition-all duration-300 p-8">
-						<div class="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-pink/20 to-accent-pink/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-							<svg class="w-7 h-7 text-accent-pink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<div class="glass-card group hover:border-accent-pink/40 transition-all duration-500 p-10 relative overflow-hidden">
+						<div class="absolute -top-10 -right-10 w-32 h-32 bg-accent-pink/5 blur-3xl group-hover:bg-accent-pink/10 transition-colors" />
+						<div class="w-16 h-16 rounded-2xl bg-surface-elevated border border-white/5 flex items-center justify-center mb-8 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-xl">
+							<svg class="w-8 h-8 text-accent-pink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a4 4 0 11-8 0 4 4 0 018 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
 							</svg>
 						</div>
-						<h3 class="text-xl font-bold mb-3">Community Rooms</h3>
-						<p class="text-white/50 text-sm leading-relaxed">
-							Join group conversations and collaborate with your team in real-time.
+						<h3 class="text-2xl font-bold mb-4 tracking-tight uppercase italic">Node Clusters</h3>
+						<p class="text-white/40 text-sm leading-relaxed font-mono">
+							Distributed room architecture for limitless scalability. Join thousands of concurrent users seamlessly.
 						</p>
 					</div>
 				</div>
 			</div>
 
-			<footer class="p-8 border-t border-white/5 relative z-10">
-				<div class="max-w-7xl mx-auto flex justify-between items-center">
-					<p class="text-sm text-white/40">© 2026 ChatTogether</p>
-					<div class="flex gap-6">
-						<a href="#" class="text-sm text-white/40 hover:text-white transition-colors">Privacy</a>
-						<a href="#" class="text-sm text-white/40 hover:text-white transition-colors">Terms</a>
+			<footer class="p-10 border-t border-white/5 relative z-10 bg-black/40">
+				<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+					<div class="flex items-center gap-3">
+						<div class="w-6 h-6 rounded bg-gradient-to-br from-accent-cyan to-accent-purple opacity-50"></div>
+						<p class="text-xs font-mono text-white/30 tracking-widest uppercase">System version v4.2.0-alpha</p>
+					</div>
+					<div class="flex gap-10">
+						<a href="#" class="text-[10px] font-bold text-white/30 hover:text-accent-cyan transition-colors tracking-widest uppercase">Privacy_Protocol</a>
+						<a href="#" class="text-[10px] font-bold text-white/30 hover:text-accent-cyan transition-colors tracking-widest uppercase">Service_Terms</a>
+						<a href="#" class="text-[10px] font-bold text-white/30 hover:text-accent-cyan transition-colors tracking-widest uppercase">API_Access</a>
 					</div>
 				</div>
 			</footer>

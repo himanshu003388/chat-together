@@ -2,7 +2,15 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabaseBrowser';
 import { ChatService } from '../services/chat.service';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Send, User, MoreVertical, Check, CheckCheck, Phone, Video, Paperclip, X, FileText, Download, ChevronLeft, MessageCircle } from 'lucide-react';
+import { Search, Send, User, MoreVertical, Check, CheckCheck, Phone, Video, Paperclip, X, FileText, Download, ChevronLeft, MessageCircle, Zap, Shield, Cpu } from 'lucide-react';
+import ThreeBackground from './ThreeBackground';
+import TiltCard from './TiltCard';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface Profile {
   id: string;
@@ -11,6 +19,7 @@ interface Profile {
   last_seen: string | null;
   is_banned: boolean;
   bio?: string;
+  created_at?: string;
 }
 
 interface Message {
@@ -48,6 +57,8 @@ export default function ChatApp({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showProfileModal, setShowProfileModal] = useState<Profile | null>(null);
   const [showMobileList, setShowMobileList] = useState(true);
+  const [realtimeStatus, setRealtimeStatus] = useState<string>('connecting');
+  const [pulse, setPulse] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,53 +81,50 @@ export default function ChatApp({
   }, [activeUserId]);
 
   useEffect(() => {
-    // Subscribe to all messages involving this user (sender OR receiver)
     const messagesChannel = supabase
-      .channel('direct-messages-all')
+      .channel('direct-messages')
       .on('postgres_changes', {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'messages'
       }, (payload) => {
-        const msg = payload.new as Message;
-        // Only fetch if this message involves current user
-        if (msg.sender_id === currentUser.id || msg.receiver_id === currentUser.id) {
-          fetchMessages();
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+          const msg = (payload.new || payload.old) as Message;
+          if (!msg.chat_id && (msg.sender_id === currentUser.id || msg.receiver_id === currentUser.id)) {
+            fetchMessages();
+          }
         }
       })
       .subscribe((status) => {
-        console.log('Messages channel status:', status);
+        setRealtimeStatus(status);
       });
 
-    // Typing indicator channel
-    const typingChannel = supabase
-      .channel('direct-typing-all')
+    const presenceChannel = supabase.channel('direct-presence');
+    
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        // Presence sync logic
+      })
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         if (payload.userId === activeUserId) {
           setOtherUserTyping(payload.typing);
         }
       })
-      .subscribe();
-
-    // Fallback polling in case realtime doesn't work
-    const pollInterval = setInterval(() => {
-      fetchMessages();
-    }, 5000); // Poll every 5 seconds as backup
-
-    updateLastSeen();
-    const lastSeenInterval = setInterval(updateLastSeen, 30000);
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            user_id: currentUser.id,
+            username: currentUser.username,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
 
     return () => {
       supabase.removeChannel(messagesChannel);
-      supabase.removeChannel(typingChannel);
-      clearInterval(pollInterval);
-      clearInterval(lastSeenInterval);
+      supabase.removeChannel(presenceChannel);
     };
   }, [activeUserId, currentUser.id]);
-
-  const updateLastSeen = async () => {
-    await supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id);
-  };
 
   const fetchMessages = async () => {
     if (!activeUserId) return;
@@ -164,6 +172,9 @@ export default function ChatApp({
     e.preventDefault();
     if ((!newMessage.trim() && !selectedFile) || !activeUserId || uploading) return;
 
+    setPulse(true);
+    setTimeout(() => setPulse(false), 500);
+
     setUploading(true);
     try {
       let fileInfo = null;
@@ -177,7 +188,6 @@ export default function ChatApp({
 
       await chatService.sendMessage(currentUser.id, newMessage.trim() || null, null, activeUserId, null, fileInfo);
 
-      // Optimistic update - add message immediately with a temporary ID
       const tempId = 'temp-' + Date.now().toString() + Math.random().toString(36).substring(7);
       const newMsg: Message = {
         id: tempId,
@@ -190,9 +200,6 @@ export default function ChatApp({
         file_type: fileInfo?.type
       };
       setMessages(prev => [...prev, newMsg]);
-
-      // Fetch updated messages to get the real message from the server
-      // This will also remove the temp message and show the real one
       fetchMessages();
 
       setNewMessage('');
@@ -217,123 +224,290 @@ export default function ChatApp({
   };
 
   return (
-    <div className="flex w-full h-full bg-surface-primary overflow-hidden">
-      {/* Sidebar - always visible on desktop, toggleable on mobile */}
-      <div className={`${showMobileList || !activeUserId ? 'flex' : 'hidden md:flex'} w-full md:w-80 bg-surface-secondary border-r border-white/5 flex flex-col`}>
-        <div className="p-4 border-b border-white/5">
-          <h2 className="text-xl font-bold mb-4">Direct Nodes</h2>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-            <input type="text" placeholder="Scan users..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="input-glass text-sm pl-9 py-2.5" />
+    <div className="flex w-full h-full bg-surface-primary/20 backdrop-blur-[2px] overflow-hidden relative noise-overlay">
+      <ThreeBackground pulse={pulse} />
+      
+      {/* Sidebar */}
+      <div className={cn(
+        "z-10 w-full md:w-96 glass-dark border-r border-white/5 flex flex-col transition-all duration-500",
+        !showMobileList && activeUserId ? "hidden md:flex" : "flex"
+      )}>
+        <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-5 h-5 text-accent-cyan animate-pulse" />
+              <h2 className="text-xl font-bold tracking-tighter uppercase italic">Nodes</h2>
+            </div>
+            <div className={cn(
+              "px-2 py-0.5 rounded-full text-[10px] font-mono border",
+              realtimeStatus === 'SUBSCRIBED' ? "text-accent-emerald border-accent-emerald/30 bg-accent-emerald/10" : "text-accent-pink border-accent-pink/30 bg-accent-pink/10"
+            )}>
+              {realtimeStatus === 'SUBSCRIBED' ? 'ENCRYPTED' : 'SYNCING'}
+            </div>
+          </div>
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-accent-cyan transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Scan for active nodes..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              className="input-glass !bg-black/40 text-sm pl-10 py-3 border-white/5 hover:border-white/10 transition-all" 
+            />
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {filteredProfiles.map((p) => (
-            <button key={p.id} onClick={() => { setActiveUserId(p.id); setShowMobileList(false); }} className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-all border-b border-white/5 ${activeUserId === p.id ? 'bg-white/10' : ''}`}>
-              <div className="relative">
-                <button onClick={(e) => { e.stopPropagation(); setShowProfileModal(p); }} className="w-12 h-12 rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold hover:ring-2 hover:ring-accent-cyan/50 transition-all">
+            <button 
+              key={p.id} 
+              onClick={() => { setActiveUserId(p.id); setShowMobileList(false); }} 
+              className={cn(
+                "w-full p-4 flex items-center gap-4 transition-all border-b border-white/5 relative overflow-hidden group",
+                activeUserId === p.id ? 'bg-accent-cyan/[0.07] border-l-2 border-l-accent-cyan' : 'hover:bg-white/[0.03]'
+              )}
+            >
+              <div className="relative shrink-0">
+                <div className={cn(
+                  "w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg transition-all transform group-hover:scale-110 group-hover:rotate-3 shadow-lg shadow-black/40",
+                  activeUserId === p.id ? "bg-accent-cyan text-surface-primary" : "bg-surface-elevated text-white/70"
+                )}>
                   {p.username[0].toUpperCase()}
-                </button>
-                {isOnline(p.last_seen) && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-accent-emerald rounded-full border-2 border-surface-secondary"></div>}
+                </div>
+                {isOnline(p.last_seen) && (
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-accent-emerald rounded-full border-4 border-surface-secondary shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                )}
               </div>
               <div className="flex-1 text-left">
-                <button onClick={(e) => { e.stopPropagation(); setShowProfileModal(p); }} className="font-bold text-sm hover:text-accent-cyan transition-colors">{p.username}</button>
-                <div className="text-[10px] uppercase tracking-widest text-white/30">{isOnline(p.last_seen) ? 'Active' : 'Offline'}</div>
+                <div className="flex justify-between items-center mb-0.5">
+                  <span className="font-bold text-sm tracking-wide group-hover:text-accent-cyan transition-colors">{p.username}</span>
+                  <span className="text-[10px] text-white/20 font-mono">ID: {p.id.slice(0, 4)}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className={cn("w-1.5 h-1.5 rounded-full", isOnline(p.last_seen) ? "bg-accent-emerald animate-pulse" : "bg-white/10")}></div>
+                  <span className="text-[10px] uppercase tracking-widest text-white/30">{isOnline(p.last_seen) ? 'Active' : 'Offline'}</span>
+                </div>
               </div>
+              {activeUserId === p.id && (
+                <motion.div layoutId="active-indicator" className="absolute right-0 top-0 bottom-0 w-1 bg-accent-cyan shadow-[0_0_15px_rgba(0,212,255,0.5)]" />
+              )}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Chat Area - full width on mobile, flex-1 on desktop */}
-      <div className={`flex-1 flex flex-col relative ${activeUserId ? 'w-full md:w-auto' : 'w-full'}`}>
+      {/* Main Chat Area */}
+      <div className={cn(
+        "flex-1 flex flex-col relative z-10 transition-all duration-500",
+        activeUserId ? 'w-full md:w-auto' : 'w-full'
+      )}>
         {activeUserId && activeUserProfile ? (
           <>
-            <div className="p-4 border-b border-white/5 glass flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button onClick={() => setShowProfileModal(activeUserProfile)} className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold hover:ring-2 hover:ring-accent-cyan/50 transition-all">
-                  {activeUserProfile.username[0].toUpperCase()}
+            {/* Chat Header */}
+            <div className="p-4 sm:p-6 glass-dark border-b border-white/5 flex items-center justify-between bg-black/20">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setShowProfileModal(activeUserProfile)} className="relative group shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent-cyan via-accent-blue to-accent-purple p-[1px] shadow-lg shadow-accent-cyan/10">
+                    <div className="w-full h-full rounded-2xl bg-surface-primary flex items-center justify-center font-bold text-lg group-hover:scale-95 transition-transform">
+                      {activeUserProfile.username[0].toUpperCase()}
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-4 border-surface-secondary",
+                    isOnline(activeUserProfile.last_seen) ? "bg-accent-emerald shadow-[0_0_10px_rgba(16,185,129,0.5)]" : "bg-white/20"
+                  )}></div>
                 </button>
                 <div>
-                  <button onClick={() => setShowProfileModal(activeUserProfile)} className="font-bold hover:text-accent-cyan transition-colors">{activeUserProfile.username}</button>
-                  <p className="text-[10px] text-white/40 uppercase tracking-widest">{isOnline(activeUserProfile.last_seen) ? 'Link Established' : 'Signal Lost'}</p>
+                  <button onClick={() => setShowProfileModal(activeUserProfile)} className="font-bold text-lg hover:text-accent-cyan transition-colors flex items-center gap-2">
+                    {activeUserProfile.username}
+                    <Shield className="w-3.5 h-3.5 text-accent-cyan opacity-50" />
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <Zap className={cn("w-3 h-3", isOnline(activeUserProfile.last_seen) ? "text-accent-emerald animate-pulse" : "text-white/20")} />
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest font-mono">
+                      {isOnline(activeUserProfile.last_seen) ? 'Secure Link Active' : 'Signal Lost / Inactive'}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => { setShowMobileList(true); setActiveUserId(null); }} className="md:hidden p-2.5 rounded-xl hover:bg-white/10 text-white/60"><ChevronLeft className="w-5 h-5" /></button>
-                <button className="p-2.5 rounded-xl hover:bg-white/10 text-white/60"><Phone className="w-5 h-5" /></button>
-                <button className="p-2.5 rounded-xl hover:bg-white/10 text-white/60"><Video className="w-5 h-5" /></button>
+                <button onClick={() => { setShowMobileList(true); setActiveUserId(null); }} className="md:hidden p-3 rounded-2xl hover:bg-white/5 text-white/60 hover:text-accent-cyan transition-all"><ChevronLeft className="w-5 h-5" /></button>
+                <button className="p-3 rounded-2xl hover:bg-white/5 text-white/60 hover:text-accent-cyan transition-all"><Phone className="w-5 h-5" /></button>
+                <button className="p-3 rounded-2xl hover:bg-white/5 text-white/60 hover:text-accent-cyan transition-all"><Video className="w-5 h-5" /></button>
+                <button className="p-3 rounded-2xl hover:bg-white/5 text-white/60 hover:text-accent-cyan transition-all"><MoreVertical className="w-5 h-5" /></button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 custom-scrollbar bg-black/5">
               {loadingMessages ? (
-                <div className="h-full flex items-center justify-center opacity-20 animate-pulse font-mono text-xs uppercase tracking-widest">Decoding Stream...</div>
+                <div className="h-full flex flex-col items-center justify-center gap-4">
+                  <div className="w-12 h-12 border-2 border-accent-cyan/20 border-t-accent-cyan rounded-full animate-spin" />
+                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent-cyan animate-pulse">Decrypting secure channel...</div>
+                </div>
               ) : (
-                messages.map((msg) => {
-                  const isMe = msg.sender_id === currentUser.id;
-                  return (
-                    <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[70%]`}>
-                        <div className={`rounded-2xl px-4 py-3 ${isMe ? 'bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary shadow-lg shadow-accent-cyan/10' : 'bg-surface-elevated border border-white/5'}`}>
-                          {msg.file_url && (
-                            <div className="mb-2 rounded-xl overflow-hidden bg-black/10">
-                              {msg.file_type?.startsWith('image/') ? (
-                                <img src={getFileUrl(msg.file_url)} className="max-w-full h-auto max-h-60 object-contain cursor-pointer" onClick={() => window.open(getFileUrl(msg.file_url!), '_blank')} />
-                              ) : (
-                                <div className="p-3 flex items-center gap-3">
-                                  <FileText className="w-5 h-5" />
-                                  <div className="flex-1 overflow-hidden">
-                                    <p className="text-xs font-bold truncate">{msg.file_name}</p>
-                                    <a href={getFileUrl(msg.file_url)} download className="text-[10px] text-accent-cyan underline">Download</a>
+                <div className="flex flex-col gap-6">
+                  {messages.map((msg, idx) => {
+                    const isMe = msg.sender_id === currentUser.id;
+                    return (
+                      <motion.div 
+                        key={msg.id} 
+                        initial={{ opacity: 0, x: isMe ? 20 : -20, y: 10 }} 
+                        animate={{ opacity: 1, x: 0, y: 0 }} 
+                        transition={{ type: 'spring', damping: 20, stiffness: 200, delay: Math.min(idx * 0.05, 0.5) }}
+                        className={cn("flex", isMe ? 'justify-end' : 'justify-start')}
+                      >
+                        <div className={cn("flex flex-col", isMe ? 'items-end' : 'items-start', "max-w-[85%] sm:max-w-[70%]")}>
+                          <div className={cn(
+                            "group relative px-5 py-3.5 transition-all duration-300",
+                            isMe 
+                              ? "bg-gradient-to-br from-accent-cyan to-accent-blue text-surface-primary rounded-2xl rounded-tr-none shadow-[0_10px_30px_rgba(0,212,255,0.2)]" 
+                              : "glass-dark border border-white/5 text-white/90 rounded-2xl rounded-tl-none hover:border-white/20"
+                          )}>
+                            {msg.file_url && (
+                              <div className="mb-3 rounded-xl overflow-hidden bg-black/20 border border-white/5">
+                                {msg.file_type?.startsWith('image/') ? (
+                                  <img src={getFileUrl(msg.file_url)} className="max-w-full h-auto max-h-64 object-contain cursor-pointer transition-transform hover:scale-105" onClick={() => window.open(getFileUrl(msg.file_url!), '_blank')} />
+                                ) : (
+                                  <div className="p-4 flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-accent-cyan">
+                                      <FileText className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex-1 overflow-hidden">
+                                      <p className="text-xs font-bold truncate">{msg.file_name}</p>
+                                      <a href={getFileUrl(msg.file_url)} download className="text-[10px] text-accent-cyan hover:underline uppercase tracking-widest font-bold">Download Asset</a>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
+                              </div>
+                            )}
+                            <p className="text-[15px] leading-relaxed tracking-tight">{msg.content}</p>
+                            
+                            {/* Time overlay on hover */}
+                            <div className={cn(
+                              "absolute bottom-0 opacity-0 group-hover:opacity-100 transition-opacity translate-y-full py-1 font-mono text-[9px] uppercase tracking-widest",
+                              isMe ? "right-0 text-white/30" : "left-0 text-white/30"
+                            )}>
+                              SENT AT {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
                             </div>
-                          )}
-                          <p className="text-sm leading-relaxed">{msg.content}</p>
+                          </div>
+                          
+                          <div className="mt-2 flex items-center gap-1.5 px-1">
+                             <span className="text-[9px] text-white/10 font-mono tracking-tighter">
+                               {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                             </span>
+                             {isMe && (
+                               msg.is_read 
+                                ? <CheckCheck className="w-3.5 h-3.5 text-accent-cyan drop-shadow-[0_0_5px_rgba(0,212,255,0.5)]" /> 
+                                : <Check className="w-3.5 h-3.5 text-white/10" />
+                             )}
+                          </div>
                         </div>
-                        <div className="mt-1 flex items-center gap-1">
-                           <span className="text-[9px] text-white/20 font-mono">{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
-                           {isMe && (msg.is_read ? <CheckCheck className="w-3 h-3 text-accent-cyan" /> : <Check className="w-3 h-3 text-white/20" />)}
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })
+                      </motion.div>
+                    );
+                  })}
+                </div>
               )}
-              {otherUserTyping && <div className="text-[10px] text-accent-cyan font-bold uppercase tracking-widest animate-pulse">{activeUserProfile.username} is encoding message...</div>}
-              <div ref={messagesEndRef} />
+              {otherUserTyping && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 bg-accent-cyan rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <div className="w-1.5 h-1.5 bg-accent-cyan rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <div className="w-1.5 h-1.5 bg-accent-cyan rounded-full animate-bounce" />
+                  </div>
+                  <div className="text-[10px] text-accent-cyan font-bold uppercase tracking-[0.2em] animate-pulse">
+                    {activeUserProfile.username} is encoding message...
+                  </div>
+                </motion.div>
+              )}
+              <div ref={messagesEndRef} className="h-4" />
             </div>
 
-            <div className="p-4 border-t border-white/5 bg-surface-primary/50 backdrop-blur-md">
+            {/* Input Area */}
+            <div className="p-4 sm:p-6 glass-dark border-t border-white/5 bg-black/40 relative">
               <AnimatePresence>
                 {selectedFile && (
-                  <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="mb-3 p-3 glass-card flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Paperclip className="w-4 h-4 text-accent-cyan" />
-                      <span className="text-xs font-bold truncate max-w-xs">{selectedFile.name}</span>
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-4 overflow-hidden">
+                    <div className="p-4 glass-card bg-accent-cyan/5 border-accent-cyan/20 flex items-center justify-between rounded-2xl">
+                      <div className="flex items-center gap-4 overflow-hidden">
+                        <div className="w-10 h-10 rounded-xl bg-accent-cyan/10 flex items-center justify-center">
+                           <Paperclip className="w-5 h-5 text-accent-cyan" />
+                        </div>
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="text-sm font-bold truncate text-white/90">{selectedFile.name}</span>
+                          <span className="text-[10px] text-white/30 uppercase tracking-widest">Ready for uplink</span>
+                        </div>
+                      </div>
+                      <button onClick={() => setSelectedFile(null)} className="p-2 hover:bg-white/5 rounded-xl text-white/40 hover:text-accent-pink transition-colors"><X className="w-5 h-5" /></button>
                     </div>
-                    <button onClick={() => setSelectedFile(null)} className="p-1 hover:bg-white/10 rounded-lg"><X className="w-4 h-4" /></button>
                   </motion.div>
                 )}
               </AnimatePresence>
-              <form onSubmit={handleSend} className="flex gap-3 items-end">
+              
+              <form onSubmit={handleSend} className="flex gap-3 items-end max-w-6xl mx-auto">
                 <input type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="hidden" />
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3.5 rounded-xl hover:bg-white/5 text-white/40"><Paperclip className="w-5 h-5" /></button>
-                <div className="flex-1">
-                  <input type="text" value={newMessage} onChange={handleTyping} placeholder="Enter protocol data..." className="input-glass !py-3.5" disabled={uploading} />
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()} 
+                  className="p-4 rounded-2xl hover:bg-white/5 text-white/40 hover:text-accent-cyan transition-all mb-0.5"
+                >
+                  <Paperclip className="w-6 h-6" />
+                </button>
+                <div className="flex-1 relative group">
+                  <div className="absolute inset-0 bg-accent-cyan/5 rounded-2xl opacity-0 group-focus-within:opacity-100 transition-opacity blur-xl pointer-events-none" />
+                  <input 
+                    type="text" 
+                    value={newMessage} 
+                    onChange={handleTyping} 
+                    placeholder="Type your transmission..." 
+                    className="input-glass !bg-black/60 !py-4 !px-6 text-base !border-white/10 focus:!border-accent-cyan/50 focus:!ring-accent-cyan/10 transition-all placeholder:text-white/20" 
+                    disabled={uploading} 
+                  />
                 </div>
-                <button type="submit" disabled={(!newMessage.trim() && !selectedFile) || uploading} className="p-3.5 rounded-xl bg-gradient-to-r from-accent-cyan to-accent-blue text-white shadow-lg shadow-accent-cyan/20">
-                  {uploading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-5 h-5" />}
+                <button 
+                  type="submit" 
+                  disabled={(!newMessage.trim() && !selectedFile) || uploading} 
+                  className={cn(
+                    "p-4 rounded-2xl font-bold flex items-center justify-center transition-all mb-0.5 shadow-2xl group",
+                    (!newMessage.trim() && !selectedFile) || uploading
+                      ? "bg-white/5 text-white/20"
+                      : "bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary shadow-accent-cyan/20 hover:shadow-accent-cyan/40 hover:scale-105 active:scale-95"
+                  )}
+                >
+                  {uploading ? (
+                    <div className="w-6 h-6 border-2 border-surface-primary/20 border-t-surface-primary rounded-full animate-spin" />
+                  ) : (
+                    <Send className="w-6 h-6 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  )}
                 </button>
               </form>
+              <div className="mt-4 flex items-center justify-center gap-6">
+                <div className="flex items-center gap-2">
+                   <div className="w-1 h-1 rounded-full bg-accent-cyan shadow-[0_0_5px_rgba(0,212,255,1)]" />
+                   <span className="text-[9px] font-mono text-white/20 uppercase tracking-[0.2em]">Secure End-to-End Encryption</span>
+                </div>
+                <div className="flex items-center gap-2">
+                   <div className="w-1 h-1 rounded-full bg-accent-purple shadow-[0_0_5px_rgba(168,85,247,1)]" />
+                   <span className="text-[9px] font-mono text-white/20 uppercase tracking-[0.2em]">Real-time Latency: 12ms</span>
+                </div>
+              </div>
             </div>
           </>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center opacity-20">
-            <User className="w-16 h-16 mb-4" />
-            <h3 className="text-xl font-bold uppercase tracking-widest">Select Signal Source</h3>
+          <div className="h-full flex flex-col items-center justify-center relative p-8 text-center max-w-md mx-auto">
+            <div className="relative mb-8">
+              <div className="absolute inset-0 bg-accent-cyan/20 blur-3xl rounded-full" />
+              <div className="relative w-32 h-32 rounded-3xl bg-surface-elevated border border-white/10 flex items-center justify-center">
+                <Cpu className="w-16 h-16 text-accent-cyan animate-pulse" />
+              </div>
+            </div>
+            <h3 className="text-3xl font-bold tracking-tighter uppercase italic mb-4">Signal Hub</h3>
+            <p className="text-white/40 text-sm leading-relaxed mb-8">Select an active node from the sidebar to establish a secure, encrypted communication channel.</p>
+            <div className="flex flex-wrap justify-center gap-2 opacity-30">
+               {['ENCRYPT', 'SYNC', 'NODE_SCAN', 'LINK_ID'].map(tag => (
+                 <span key={tag} className="px-3 py-1 border border-white/20 rounded-full text-[9px] font-mono">{tag}</span>
+               ))}
+            </div>
           </div>
         )}
       </div>
@@ -341,24 +515,76 @@ export default function ChatApp({
       {/* Profile Modal */}
       <AnimatePresence>
         {showProfileModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowProfileModal(null)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-surface-secondary border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="text-center">
-                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold text-2xl mb-4">
-                  {showProfileModal.username[0].toUpperCase()}
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4" 
+            onClick={() => setShowProfileModal(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+              className="bg-surface-secondary/50 border border-white/10 rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl relative overflow-hidden glass" 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple" />
+              
+              <div className="text-center relative z-10">
+                <TiltCard className="inline-block mb-8">
+                  <div className="w-32 h-32 mx-auto rounded-[2rem] bg-gradient-to-br from-accent-cyan via-accent-blue to-accent-purple p-1 shadow-2xl shadow-accent-cyan/20">
+                    <div className="w-full h-full rounded-[1.8rem] bg-surface-primary flex items-center justify-center font-bold text-5xl">
+                      {showProfileModal.username[0].toUpperCase()}
+                    </div>
+                  </div>
+                </TiltCard>
+                
+                <h2 className="text-3xl font-bold tracking-tighter mb-1 uppercase italic">{showProfileModal.username}</h2>
+                <div className="flex items-center justify-center gap-2 mb-8">
+                  <div className={cn("w-2 h-2 rounded-full", isOnline(showProfileModal.last_seen) ? "bg-accent-emerald animate-pulse" : "bg-white/10")}></div>
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-mono">
+                    {isOnline(showProfileModal.last_seen) ? 'Link Operational' : 'Offline / Dormant'}
+                  </p>
                 </div>
-                <h2 className="text-xl font-bold mb-1">{showProfileModal.username}</h2>
-                <p className="text-[10px] uppercase tracking-widest text-white/40 mb-4">{isOnline(showProfileModal.last_seen) ? 'Online' : 'Offline'}</p>
-                {showProfileModal.bio && <p className="text-sm text-white/60 mb-4">{showProfileModal.bio}</p>}
-                <p className="text-[10px] text-white/30 mb-6">Joined {showProfileModal.created_at ? new Date(showProfileModal.created_at).toLocaleDateString() : 'recently'}</p>
-                <div className="flex gap-3">
-                  <button onClick={() => { setShowProfileModal(null); setActiveUserId(showProfileModal.id); setShowMobileList(false); }} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-accent-cyan to-accent-blue text-white font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-accent-cyan/20 transition-all">
-                    <MessageCircle className="w-4 h-4" />
-                    Message
+                
+                {showProfileModal.bio ? (
+                  <p className="text-white/60 text-base leading-relaxed mb-10 italic">"{showProfileModal.bio}"</p>
+                ) : (
+                  <p className="text-white/20 text-sm mb-10 font-mono tracking-widest">[ NO BIO DATA FOUND ]</p>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4 mb-10">
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-4 text-left">
+                    <p className="text-[9px] uppercase tracking-widest text-white/30 mb-1 font-mono">Node ID</p>
+                    <p className="text-sm font-mono text-accent-cyan">#TX-{showProfileModal.id.slice(0, 8)}</p>
+                  </div>
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-4 text-left">
+                    <p className="text-[9px] uppercase tracking-widest text-white/30 mb-1 font-mono">Status</p>
+                    <p className="text-sm font-mono text-white/80">{isOnline(showProfileModal.last_seen) ? 'VERIFIED' : 'UNSTABLE'}</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => { setShowProfileModal(null); setActiveUserId(showProfileModal.id); setShowMobileList(false); }} 
+                    className="flex-1 py-5 rounded-2xl bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary font-bold flex items-center justify-center gap-3 hover:shadow-[0_0_30px_rgba(0,212,255,0.4)] hover:scale-[1.02] transition-all"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    OPEN CHANNEL
                   </button>
-                  <button onClick={() => setShowProfileModal(null)} className="px-4 py-3 rounded-xl border border-white/10 hover:bg-white/5 transition-all">Close</button>
+                  <button 
+                    onClick={() => setShowProfileModal(null)} 
+                    className="px-8 py-5 rounded-2xl border border-white/10 hover:bg-white/5 transition-all text-white/60 font-bold tracking-widest text-xs"
+                  >
+                    DISCONNECT
+                  </button>
                 </div>
               </div>
+              
+              {/* Background accent */}
+              <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-accent-cyan/10 blur-[100px] rounded-full pointer-events-none" />
+              <div className="absolute -top-20 -left-20 w-64 h-64 bg-accent-purple/10 blur-[100px] rounded-full pointer-events-none" />
             </motion.div>
           </motion.div>
         )}

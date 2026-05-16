@@ -232,44 +232,48 @@ DROP POLICY IF EXISTS "Anyone can update chat attachments." ON storage.objects;
 CREATE POLICY "Anyone can update chat attachments." ON storage.objects FOR UPDATE USING ( bucket_id = 'chat-attachments' );
 
 -- ==========================================
--- 5. REALTIME (Skip if already added - no error on duplicate)
+-- 5. REALTIME CONFIGURATION
 -- ==========================================
 
+-- 1. Ensure the publication exists
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'messages'
-  ) THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END $$;
+
+-- 2. Add tables to the publication
+DO $$
+BEGIN
+  -- Messages
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'messages') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
   END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'profiles'
-  ) THEN
+  
+  -- Profiles
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'profiles') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
   END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'reactions'
-  ) THEN
+  
+  -- Reactions
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'reactions') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.reactions;
   END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'pinned_messages'
-  ) THEN
+  
+  -- Pinned Messages
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'pinned_messages') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.pinned_messages;
   END IF;
 END $$;
+
+-- 3. Set REPLICA IDENTITY to FULL
+-- This ensures that for UPDATE and DELETE events, the old record data is included
+-- and that filters (like receiver_id=is.null) work reliably.
+ALTER TABLE public.messages REPLICA IDENTITY FULL;
+ALTER TABLE public.profiles REPLICA IDENTITY FULL;
+ALTER TABLE public.reactions REPLICA IDENTITY FULL;
+ALTER TABLE public.pinned_messages REPLICA IDENTITY FULL;
 
 -- Refresh schema cache
 NOTIFY pgrst, 'reload schema';
