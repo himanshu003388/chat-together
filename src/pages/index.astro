@@ -10,9 +10,9 @@ const error = Astro.url.searchParams.get('error');
 
 <Layout title="ChatTogether">
 	{user ? (
-		<div class="h-[calc(100vh-64px)] flex flex-col bg-surface-primary overflow-hidden">
+		<div class="h-[calc(100vh-64px)] flex flex-col bg-surface-primary">
 			{/* Main Content - just the chat component, nav is in Layout */}
-			<div class="flex-1 overflow-hidden">
+			<div class="flex-1 overflow-y-auto">
 				<GeneralChat
 					client:load
 					currentUser={{
