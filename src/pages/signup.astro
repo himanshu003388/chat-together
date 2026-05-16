@@ -9,53 +9,61 @@ if (user) {
 const error = Astro.url.searchParams.get('error');
 ---
 
-<Layout title="Initialize Identity">
-	<div class="min-h-full flex items-center justify-center py-24 px-6 lg:px-8 bg-elite-neutral-50/50 relative">
-		{/* Background Grid */}
-		<div class="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style="background-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px); background-size: 40px 40px;"></div>
+<Layout title="Sign Up">
+	<div class="min-h-full flex items-center justify-center py-12 px-6 relative">
+		{/* Background Effects */}
+		<div class="fixed inset-0 pointer-events-none">
+			<div class="absolute top-20 -left-60 w-96 h-96 bg-accent-purple/15 rounded-full blur-3xl"></div>
+			<div class="absolute bottom-20 -right-60 w-96 h-96 bg-accent-pink/15 rounded-full blur-3xl"></div>
+		</div>
 
-		<div class="max-w-xl w-full space-y-12 bg-white p-16 elite-border shadow-[24px_24px_0px_0px_rgba(0,0,0,0.05)] relative z-10">
-			<div>
-				<div class="w-12 h-1 bg-elite-black mb-8"></div>
-				<h2 class="text-5xl font-black text-elite-black tracking-tightest uppercase leading-none">
-					Network<br/>Registration
-				</h2>
-				<p class="mt-4 text-[10px] font-bold text-elite-neutral-400 uppercase tracking-[0.3em]">
-					Request New Identity Protocol
-				</p>
+		<div class="max-w-md w-full space-y-8 glass-card p-10 relative z-10">
+			<div class="text-center">
+				<div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center mb-6 shadow-glow-purple">
+					<svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0H9m9-5a3 3 0 11-6 0 3 3 0 016 0zm6 3v2m0-3v2m0-3v2m-6 3h12a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2m12 3V9m0 0h3m-3 0h-3" />
+					</svg>
+				</div>
+				<h2 class="text-3xl font-bold">Create account</h2>
+				<p class="mt-2 text-white/50 text-sm">Join the community and start chatting</p>
 			</div>
 
 			{error && (
-				<div class="bg-elite-black text-white p-6 elite-border shadow-[8px_8px_0px_0px_rgba(0,0,0,0.1)]">
-					<p class="text-[10px] font-black uppercase tracking-widest">{error}</p>
+				<div class="glass border-red-500/30 p-4 rounded-lg">
+					<p class="text-red-400 text-sm">{error}</p>
 				</div>
 			)}
 
-			<form class="mt-12 space-y-10" action="/api/auth/signup" method="post">
-				<div class="space-y-8">
-					<div class="space-y-3">
-						<label for="username" class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Identity Alias</label>
-						<input id="username" name="username" type="text" autocomplete="username" required minlength="3" maxlength="30" pattern="[a-zA-Z0-9_]+" class="w-full bg-elite-neutral-50 elite-border px-6 py-4 focus:bg-white focus:ring-12 focus:ring-elite-black/5 transition-all outline-none font-bold uppercase tracking-tighter" placeholder="ALIAS_01">
-						<p class="text-[8px] font-mono font-bold text-elite-neutral-400 uppercase tracking-widest">ALPHANUMERIC + UNDERSCORES ONLY</p>
+			<form class="mt-8 space-y-6" action="/api/auth/signup" method="post">
+				<div class="space-y-5">
+					<div>
+						<label for="username" class="text-sm font-medium text-white/70 mb-2 block">Username</label>
+						<input id="username" name="username" type="text" autocomplete="username" required minlength="3" maxlength="30" pattern="[a-zA-Z0-9_]+" class="input-glass" placeholder="john_doe">
+						<p class="text-xs text-white/40 mt-2">Letters, numbers, and underscores only</p>
 					</div>
-					<div class="space-y-3">
-						<label for="email-address" class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Email Vector</label>
-						<input id="email-address" name="email" type="email" autocomplete="email" required class="w-full bg-elite-neutral-50 elite-border px-6 py-4 focus:bg-white focus:ring-12 focus:ring-elite-black/5 transition-all outline-none font-bold uppercase tracking-tighter" placeholder="IDENTITY@NETWORK.COM">
+					<div>
+						<label for="email-address" class="text-sm font-medium text-white/70 mb-2 block">Email</label>
+						<input id="email-address" name="email" type="email" autocomplete="email" required class="input-glass" placeholder="you@example.com">
 					</div>
-					<div class="space-y-3">
-						<label for="password" class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Security Key</label>
-						<input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" class="w-full bg-elite-neutral-50 elite-border px-6 py-4 focus:bg-white focus:ring-12 focus:ring-elite-black/5 transition-all outline-none font-bold tracking-tighter" placeholder="MINIMUM 8 CHARACTERS">
+					<div>
+						<label for="password" class="text-sm font-medium text-white/70 mb-2 block">Password</label>
+						<input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" class="input-glass" placeholder="••••••••">
+						<p class="text-xs text-white/40 mt-2">Minimum 8 characters</p>
 					</div>
 				</div>
 
-				<div class="pt-4">
-					<button type="submit" class="elite-button w-full bg-elite-black text-white text-lg py-5 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.2)] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-1 hover:-translate-y-1 transition-all">
-						INITIALIZE REGISTRATION
+				<div>
+					<button type="submit" class="btn-primary w-full !py-3.5 bg-gradient-to-r from-accent-purple to-accent-pink">
+						Create Account
 					</button>
 				</div>
 			</form>
-			<div class="text-center pt-4 border-t border-elite-neutral-100">
-				<a href="/login" class="text-[9px] font-black uppercase tracking-[0.3em] text-elite-neutral-400 hover:text-elite-black hover:line-through transition-all">Returning Protocol User</a>
+
+			<div class="text-center">
+				<p class="text-sm text-white/50">
+					Already have an account?
+					<a href="/login" class="text-accent-cyan hover:underline font-medium">Sign in</a>
+				</p>
 			</div>
 		</div>
 	</div>

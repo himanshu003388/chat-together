@@ -12,55 +12,47 @@ const { data: profile } = await supabase
 
 ---
 
-<Layout title="Protocol Identity">
-	<div class="max-w-4xl mx-auto py-20 px-8 w-full flex flex-col gap-12">
-		<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-3 border-elite-black pb-12">
+<Layout title="Profile">
+	<div class="max-w-2xl mx-auto py-12 px-6">
+		<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
 			<div>
-				<span class="text-[10px] font-black uppercase tracking-[0.3em] text-elite-neutral-400 mb-2 block">Network Node Identity</span>
-				<h1 class="text-6xl font-black text-elite-black tracking-tightest uppercase leading-none">Profile</h1>
+				<p class="text-sm text-white/40 font-mono mb-2">Your Profile</p>
+				<h1 class="text-4xl font-bold">Account Settings</h1>
 			</div>
-			<a href="/profile/edit" class="elite-button bg-elite-black text-white shadow-[6px_6px_0px_0px_rgba(0,0,0,0.2)] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-1 hover:-translate-y-1">
-				MODIFY PROTOCOL
+			<a href="/profile/edit" class="btn-secondary">
+				Edit Profile
 			</a>
 		</div>
 
-		<div class="bg-white elite-border overflow-hidden shadow-[16px_16px_0px_0px_rgba(0,0,0,0.03)]">
-			<div class="grid grid-cols-1 divide-y divide-elite-black">
-				<div class="p-10 md:grid md:grid-cols-3 md:gap-12 bg-elite-neutral-50/50">
-					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400 mb-4 md:mb-0">Signal Avatar</dt>
-					<dd class="md:col-span-2">
-						{profile?.avatar_url ? (
-							<img src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${profile.avatar_url}`} alt="" class="h-24 w-24 elite-border object-cover bg-white p-1" />
-						) : (
-							<div class="h-24 w-24 elite-border flex items-center justify-center bg-elite-black text-white font-black text-3xl">
-								{profile?.username?.charAt(0).toUpperCase()}
-							</div>
-						)}
-					</dd>
-				</div>
-				
-				<div class="p-10 md:grid md:grid-cols-3 md:gap-12">
-					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Node Alias</dt>
-					<dd class="md:col-span-2 font-black uppercase tracking-tighter text-xl">{profile?.username}</dd>
+		<div class="glass-card p-8">
+			<div class="flex flex-col items-center mb-8">
+				{profile?.avatar_url ? (
+					<img src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${profile.avatar_url}`} alt="" class="w-24 h-24 rounded-2xl object-cover border-2 border-accent-cyan/30 mb-4" />
+				) : (
+					<div class="w-24 h-24 rounded-2xl bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center text-3xl font-bold mb-4 shadow-glow-cyan">
+						{profile?.username?.charAt(0).toUpperCase()}
+					</div>
+				)}
+				<h2 class="text-2xl font-bold">{profile?.username}</h2>
+				<span class="text-white/50 text-sm font-mono">{profile?.email}</span>
+			</div>
+
+			<div class="space-y-6">
+				<div class="flex justify-between items-center py-4 border-b border-white/10">
+					<span class="text-white/40">Username</span>
+					<span class="font-medium">{profile?.username}</span>
 				</div>
 
-				<div class="p-10 md:grid md:grid-cols-3 md:gap-12 bg-elite-neutral-50/50">
-					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Secure Email</dt>
-					<dd class="md:col-span-2 font-mono text-sm uppercase font-bold text-elite-neutral-600">{profile?.email}</dd>
+				<div class="flex justify-between items-center py-4 border-b border-white/10">
+					<span class="text-white/40">Bio</span>
+					<span class="font-medium text-white/70">{profile?.bio || 'No bio set'}</span>
 				</div>
 
-				<div class="p-10 md:grid md:grid-cols-3 md:gap-12">
-					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Transmission Bio</dt>
-					<dd class="md:col-span-2 text-sm font-medium italic leading-relaxed">"{profile?.bio || 'NO ENCRYPTED DATA PROVIDED.'}"</dd>
-				</div>
-
-				<div class="p-10 md:grid md:grid-cols-3 md:gap-12 bg-elite-neutral-50/50">
-					<dt class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Access Authority</dt>
-					<dd class="md:col-span-2">
-						<span class={`elite-border px-4 py-1 text-[10px] font-black uppercase tracking-widest ${profile?.role === 'admin' ? 'bg-elite-black text-white shadow-[4px_4px_0px_0px_rgba(255,255,255,0.1)]' : 'bg-white text-elite-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'}`}>
-							{profile?.role} LEVEL
-						</span>
-					</dd>
+				<div class="flex justify-between items-center py-4 border-b border-white/10">
+					<span class="text-white/40">Role</span>
+					<span class={`px-3 py-1 rounded-full text-sm font-medium ${profile?.role === 'admin' ? 'bg-accent-cyan/20 text-accent-cyan' : 'bg-white/10 text-white/70'}`}>
+						{profile?.role}
+					</span>
 				</div>
 			</div>
 		</div>

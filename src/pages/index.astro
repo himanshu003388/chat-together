@@ -8,40 +8,40 @@ const profile = Astro.locals.profile;
 const error = Astro.url.searchParams.get('error');
 ---
 
-<Layout title="Secure Terminal" hideNav={!!user}>
+<Layout title="ChatTogether" hideNav={!!user}>
 	{user ? (
-		<div class="h-full flex flex-col bg-white overflow-hidden">
-			{/* High-Contrast Top Navigation */}
-			<header class="bg-white border-b-3 border-elite-black px-12 py-6">
-				<div class="max-w-screen-2xl mx-auto flex items-center justify-between">
-					<div class="flex items-center gap-8 group cursor-pointer">
-						<div class="w-14 h-14 bg-elite-black rounded-none flex items-center justify-center shadow-[6px_6px_0px_0px_rgba(0,0,0,0.1)] transition-all group-hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] group-hover:-translate-x-1 group-hover:-translate-y-1">
-							<span class="text-white font-black text-3xl tracking-tightest">C</span>
+		<div class="h-full flex flex-col bg-surface-primary overflow-hidden">
+			{/* Modern Header */}
+			<header class="glass border-b border-white/5 px-8 py-4">
+				<div class="max-w-7xl mx-auto flex items-center justify-between">
+					<div class="flex items-center gap-4 group cursor-pointer">
+						<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center shadow-glow-cyan">
+							<span class="text-white font-bold text-lg">C</span>
 						</div>
 						<div>
-							<h1 class="text-2xl font-black text-elite-black tracking-tightest uppercase">Network Central</h1>
-							<p class="text-[9px] font-bold text-elite-neutral-400 uppercase tracking-[0.4em]">Node Connection Established</p>
+							<h1 class="text-xl font-bold tracking-tight">Network Hub</h1>
+							<p class="text-xs text-white/40 font-mono">Connected</p>
 						</div>
 					</div>
 
-					<nav class="flex items-center gap-12">
-						<div class="hidden lg:flex items-center gap-10">
-							<a href="/chat" class="text-[10px] font-black uppercase tracking-widest hover:line-through">Secure Messages</a>
-							<a href="/chat/rooms" class="text-[10px] font-black uppercase tracking-widest hover:line-through">Public Channels</a>
-							<a href="/profile" class="text-[10px] font-black uppercase tracking-widest hover:line-through">Protocol Settings</a>
+					<nav class="flex items-center gap-6">
+						<div class="hidden lg:flex items-center gap-2">
+							<a href="/chat" class="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Messages</a>
+							<a href="/chat/rooms" class="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Communities</a>
+							<a href="/profile" class="px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Profile</a>
 						</div>
-						<div class="flex items-center gap-6 border-l-2 border-elite-neutral-100 pl-10">
+						<div class="flex items-center gap-4 pl-6 border-l border-white/10">
 							<div class="text-right hidden sm:block">
-								<p class="text-[10px] font-black text-elite-black uppercase tracking-tighter">{profile?.username || user.email}</p>
-								<div class="flex items-center justify-end gap-2 mt-1">
-									<span class="w-1 h-1 bg-green-500 rounded-full"></span>
-									<span class="text-[8px] font-mono font-bold text-green-600 uppercase">Signal Active</span>
+								<p class="text-sm font-medium text-white">{profile?.username || user.email}</p>
+								<div class="flex items-center justify-end gap-2 mt-0.5">
+									<span class="w-2 h-2 bg-accent-emerald rounded-full animate-pulse"></span>
+									<span class="text-xs text-accent-emerald font-mono">Online</span>
 								</div>
 							</div>
 							<form action="/api/auth/signout" method="post">
-								<button type="submit" aria-label="Terminate Session" class="p-3 elite-border hover:bg-red-500 hover:text-white transition-all active:scale-90">
+								<button type="submit" class="p-2.5 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-white/60 transition-all">
 									<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
 									</svg>
 								</button>
 							</form>
@@ -51,40 +51,38 @@ const error = Astro.url.searchParams.get('error');
 			</header>
 
 			{/* Main Content */}
-			<main class="flex-1 p-12 overflow-hidden">
-				<div class="max-w-screen-2xl mx-auto h-full flex gap-12">
-					{/* Sidebar Welcome & Stats */}
-					<div class="w-80 hidden xl:flex flex-col gap-8">
-						<div class="elite-card !p-8 bg-elite-neutral-50/50">
-							<span class="text-[8px] font-black uppercase tracking-[0.4em] text-elite-neutral-400 block mb-2">Protocol 7-G</span>
-							<h2 class="text-3xl font-black text-elite-black uppercase tracking-tightest leading-none mb-6">
-								Welcome, <br/>{profile?.username || 'User'}
-							</h2>
-							<p class="text-[10px] font-medium text-elite-neutral-500 uppercase leading-loose tracking-widest">
-								Global transmission channel open. Awaiting peer signals.
-							</p>
+			<main class="flex-1 p-6 overflow-hidden">
+				<div class="max-w-7xl mx-auto h-full flex gap-6">
+					{/* Sidebar */}
+					<div class="w-72 hidden xl:flex flex-col gap-4">
+						<div class="glass-card p-6">
+							<p class="text-xs text-white/40 font-mono mb-2">Welcome back</p>
+							<h2 class="text-2xl font-bold mb-2">{profile?.username || 'User'}</h2>
+							<p class="text-sm text-white/60">Ready to connect with your network</p>
 						</div>
-						
-						<div class="grid grid-cols-1 gap-4">
-							<div class="elite-card !p-6 bg-white hover:bg-elite-black hover:text-white group">
-								<p class="text-[8px] font-black uppercase tracking-widest text-elite-neutral-400 group-hover:text-white/50 mb-1">Active Nodes</p>
-								<p class="text-3xl font-black uppercase tracking-tighter">01</p>
+
+						<div class="grid grid-cols-2 gap-3">
+							<div class="glass-card p-4 hover:border-accent-cyan/30 transition-all cursor-pointer group">
+								<p class="text-xs text-white/40 mb-1">Active Chats</p>
+								<p class="text-2xl font-bold text-accent-cyan group-hover:text-accent-cyan/80">3</p>
 							</div>
-							<div class="elite-card !p-6 bg-white hover:bg-elite-black hover:text-white group">
-								<p class="text-[8px] font-black uppercase tracking-widest text-elite-neutral-400 group-hover:text-white/50 mb-1">Global Latency</p>
-								<p class="text-3xl font-black uppercase tracking-tighter">14MS</p>
+							<div class="glass-card p-4 hover:border-accent-purple/30 transition-all cursor-pointer group">
+								<p class="text-xs text-white/40 mb-1">Messages</p>
+								<p class="text-2xl font-bold text-accent-purple group-hover:text-accent-purple/80">24</p>
 							</div>
 						</div>
 
-						<div class="mt-auto border-t-2 border-elite-black pt-8">
-							<p class="text-[8px] font-mono font-bold text-elite-neutral-400 uppercase tracking-widest mb-1">Encryption Protocol</p>
-							<p class="text-[10px] font-black uppercase">AES-256-BIT SECURE</p>
+						<div class="glass-card p-4 mt-auto">
+							<div class="flex items-center gap-3">
+								<div class="w-3 h-3 rounded-full bg-accent-emerald animate-pulse"></div>
+								<span class="text-sm text-white/70 font-mono">System operational</span>
+							</div>
 						</div>
 					</div>
 
 					{/* Chat Container */}
 					<div class="flex-1 flex flex-col min-w-0">
-						<div class="flex-1 overflow-hidden shadow-[32px_32px_0px_0px_rgba(0,0,0,0.03)] border-3 border-elite-black">
+						<div class="flex-1 overflow-hidden rounded-2xl glass-card border border-white/10">
 							<GeneralChat
 								client:load
 								currentUser={{
@@ -99,94 +97,105 @@ const error = Astro.url.searchParams.get('error');
 			</main>
 		</div>
 	) : (
-		<div class="min-h-screen bg-white flex flex-col font-sans">
-			{/* Grid Background Overlay */}
-			<div class="fixed inset-0 z-0 opacity-[0.03] pointer-events-none" style="background-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px); background-size: 40px 40px;"></div>
+		<div class="min-h-screen bg-surface-primary flex flex-col relative overflow-hidden">
+			{/* Animated Background */}
+			<div class="fixed inset-0 pointer-events-none">
+				<div class="absolute inset-0 bg-gradient-to-br from-surface-primary via-surface-secondary to-surface-primary"></div>
+				<div class="absolute top-0 -left-40 w-96 h-96 bg-accent-cyan/20 rounded-full blur-3xl animate-pulse-slow"></div>
+				<div class="absolute bottom-0 -right-40 w-96 h-96 bg-accent-purple/20 rounded-full blur-3xl animate-pulse-slow" style="animation-delay: 2s;"></div>
+				<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent-pink/5 rounded-full blur-3xl animate-float"></div>
+			</div>
 
-			<div class="max-w-screen-2xl mx-auto px-12 pt-40 pb-32 relative z-10 flex-1 flex flex-col justify-center">
+			<div class="max-w-7xl mx-auto px-8 pt-24 pb-16 relative z-10 flex-1 flex flex-col">
 				{error && (
-					<div class="max-w-xl mb-20 bg-elite-black text-white p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,0.1)]">
-						<div class="flex items-center gap-6">
-							<div class="w-12 h-12 elite-border border-white flex items-center justify-center flex-shrink-0">
-								<X class="w-6 h-6 text-white" />
+					<div class="max-w-md mb-12 glass-card border-red-500/30 p-6">
+						<div class="flex items-center gap-4">
+							<div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+								<svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
 							</div>
 							<div>
-								<p class="text-[8px] font-black uppercase tracking-[0.4em] text-white/50 mb-1">System Error</p>
-								<p class="text-sm font-bold uppercase tracking-tightest leading-none">{error}</p>
+								<p class="text-sm font-medium text-red-400">Error</p>
+								<p class="text-xs text-white/60">{error}</p>
 							</div>
 						</div>
 					</div>
 				)}
 
 				{/* Hero Section */}
-				<div class="max-w-5xl">
-					<div class="inline-flex items-center gap-4 border-b-3 border-elite-black pb-4 mb-12">
-						<div class="w-3 h-3 bg-elite-black animate-ping"></div>
-						<span class="text-[10px] font-black uppercase tracking-[0.5em] text-elite-black">Signal Search: Protocol Active</span>
+				<div class="max-w-4xl mx-auto text-center py-20">
+					<div class="inline-flex items-center gap-3 glass px-4 py-2 rounded-full mb-8">
+						<span class="w-2 h-2 rounded-full bg-accent-cyan animate-pulse"></span>
+						<span class="text-sm font-medium text-white/80">Real-time messaging</span>
 					</div>
 
-					<h1 class="text-[120px] font-black text-elite-black tracking-tightest leading-[0.8] uppercase mb-16">
-						Connect<br/>
-						<span class="bg-elite-black text-white px-6 py-2">Universal</span><br/>
-						Real-Time
+					<h1 class="text-6xl md:text-7xl font-bold mb-8 leading-tight">
+						<span class="text-white">Connect</span>
+						<span class="gradient-text"> instantly</span>
 					</h1>
 
-					<p class="text-2xl font-medium text-elite-neutral-500 max-w-3xl mb-20 leading-relaxed uppercase tracking-tighter italic">
-						"High-fidelity asynchronous communication protocol designed for elite synchronization across global student networks."
+					<p class="text-xl text-white/60 max-w-2xl mx-auto mb-12 leading-relaxed">
+						Experience seamless communication with your community. Fast, secure, and beautifully designed.
 					</p>
 
 					{/* CTA Buttons */}
-					<div class="flex flex-col sm:flex-row gap-8 mb-40">
-						<a href="/signup" class="elite-button bg-elite-black text-white !py-8 !px-16 text-xl shadow-[12px_12px_0px_0px_rgba(0,0,0,0.2)] hover:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-2 hover:-translate-y-2 text-center transition-all">
-							INITIATE ACCESS
+					<div class="flex flex-col sm:flex-row gap-4 justify-center mb-20">
+						<a href="/signup" class="btn-primary text-lg !px-10 !py-4">
+							Start Chatting
 						</a>
-						<a href="/login" class="elite-button bg-white text-elite-black !py-8 !px-16 text-xl hover:bg-elite-neutral-50 text-center transition-all">
-							RETURNING USER
+						<a href="/login" class="btn-secondary text-lg !px-10 !py-4">
+							Welcome Back
 						</a>
 					</div>
 				</div>
 
-				{/* Features Grid - Stark Brutalist */}
-				<div class="grid lg:grid-cols-3 gap-0 border-3 border-elite-black bg-elite-black">
-					<div class="bg-white p-12 hover:bg-elite-black hover:text-white group transition-all duration-300 border-r-3 border-elite-black lg:border-r-3 border-b-3 lg:border-b-0">
-						<div class="w-16 h-16 elite-border flex items-center justify-center mb-10 group-hover:border-white">
-							<Hash class="w-8 h-8" />
+				{/* Features Grid */}
+				<div class="grid md:grid-cols-3 gap-6 mt-auto">
+					<div class="glass-card group hover:border-accent-cyan/30 transition-all duration-300 p-8">
+						<div class="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-cyan/20 to-accent-cyan/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+							<svg class="w-7 h-7 text-accent-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+							</svg>
 						</div>
-						<h3 class="text-3xl font-black uppercase tracking-tightest mb-6">Zero Latency</h3>
-						<p class="text-[10px] font-bold uppercase tracking-widest text-elite-neutral-400 leading-loose group-hover:text-white/60">
-							Sub-millisecond signal distribution via distributed edge nodes. Connection persistent.
+						<h3 class="text-xl font-bold mb-3">Lightning Fast</h3>
+						<p class="text-white/50 text-sm leading-relaxed">
+							Instant message delivery with real-time synchronization across all devices.
 						</p>
 					</div>
 
-					<div class="bg-white p-12 hover:bg-elite-black hover:text-white group transition-all duration-300 border-r-3 border-elite-black lg:border-r-3 border-b-3 lg:border-b-0">
-						<div class="w-16 h-16 elite-border flex items-center justify-center mb-10 group-hover:border-white">
-							<Paperclip class="w-8 h-8" />
+					<div class="glass-card group hover:border-accent-purple/30 transition-all duration-300 p-8">
+						<div class="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-purple/20 to-accent-purple/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+							<svg class="w-7 h-7 text-accent-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+							</svg>
 						</div>
-						<h3 class="text-3xl font-black uppercase tracking-tightest mb-6">Data Transfer</h3>
-						<p class="text-[10px] font-bold uppercase tracking-widest text-elite-neutral-400 leading-loose group-hover:text-white/60">
-							Encrypted object storage for seamless asset transmission across all network peers.
+						<h3 class="text-xl font-bold mb-3">End-to-End Encrypted</h3>
+						<p class="text-white/50 text-sm leading-relaxed">
+							Your conversations are secured with industry-leading encryption protocols.
 						</p>
 					</div>
 
-					<div class="bg-white p-12 hover:bg-elite-black hover:text-white group transition-all duration-300 border-b-0">
-						<div class="w-16 h-16 elite-border flex items-center justify-center mb-10 group-hover:border-white">
-							<Users class="w-8 h-8" />
+					<div class="glass-card group hover:border-accent-pink/30 transition-all duration-300 p-8">
+						<div class="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-pink/20 to-accent-pink/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+							<svg class="w-7 h-7 text-accent-pink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a4 4 0 11-8 0 4 4 0 018 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+							</svg>
 						</div>
-						<h3 class="text-3xl font-black uppercase tracking-tightest mb-6">AES-256 SECURE</h3>
-						<p class="text-[10px] font-bold uppercase tracking-widest text-elite-neutral-400 leading-loose group-hover:text-white/60">
-							End-to-end data integrity verification. Privacy is the default protocol configuration.
+						<h3 class="text-xl font-bold mb-3">Community Rooms</h3>
+						<p class="text-white/50 text-sm leading-relaxed">
+							Join group conversations and collaborate with your team in real-time.
 						</p>
 					</div>
 				</div>
 			</div>
 
-			<footer class="p-12 border-t-3 border-elite-black bg-white relative z-10">
-				<div class="max-w-screen-2xl mx-auto flex justify-between items-center">
-					<p class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">© 2026 CHATTOGETHER NETWORK • ALL SIGNALS SECURED</p>
-					<div class="flex gap-10">
-						<a href="#" class="text-[8px] font-black uppercase tracking-[0.3em] hover:underline">Documentation</a>
-						<a href="#" class="text-[8px] font-black uppercase tracking-[0.3em] hover:underline">API Protocol</a>
-						<a href="#" class="text-[8px] font-black uppercase tracking-[0.3em] hover:underline">System Status</a>
+			<footer class="p-8 border-t border-white/5 relative z-10">
+				<div class="max-w-7xl mx-auto flex justify-between items-center">
+					<p class="text-sm text-white/40">© 2026 ChatTogether</p>
+					<div class="flex gap-6">
+						<a href="#" class="text-sm text-white/40 hover:text-white transition-colors">Privacy</a>
+						<a href="#" class="text-sm text-white/40 hover:text-white transition-colors">Terms</a>
 					</div>
 				</div>
 			</footer>

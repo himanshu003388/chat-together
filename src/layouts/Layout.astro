@@ -14,55 +14,60 @@ const isBanned = profile?.is_banned || false;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="description" content="Elite Real-time Chat Experience" />
+		<meta name="description" content="ChatTogether - Premium Real-time Messaging" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 		<meta name="generator" content={Astro.generator} />
-		<title>{title} — Elite</title>
+		<title>{title} — ChatTogether</title>
 	</head>
-	<body class="bg-white text-elite-black h-screen flex flex-col font-sans selection:bg-elite-black selection:text-white">
+	<body class="bg-surface-primary text-white h-screen flex flex-col font-sans selection:bg-accent-cyan selection:text-surface-primary noise-overlay">
 		{isBanned && user ? (
-			<div class="bg-elite-black text-white py-2 px-4 text-center text-xs font-bold uppercase tracking-widest border-b border-white/20">
-				ACCESS DENIED: Account Banned.
+			<div class="bg-red-500/20 border-b border-red-500/30 text-red-400 py-2 px-4 text-center text-sm font-medium">
+				Your account has been suspended. Contact support for more information.
 			</div>
 		) : null}
 		{!hideNav && (
-			<nav class="bg-white border-b border-elite-black sticky top-0 z-50">
-				<div class="max-w-screen-2xl mx-auto px-6">
-					<div class="flex justify-between h-20">
-						<div class="flex items-center gap-12">
-							<a href="/" class="flex-shrink-0 flex items-center group">
-								<span class="text-2xl font-black tracking-tightest uppercase group-hover:bg-elite-black group-hover:text-white px-2 transition-all">ChatTogether</span>
+			<nav class="glass border-b border-white/5 sticky top-0 z-50">
+				<div class="max-w-7xl mx-auto px-6">
+					<div class="flex justify-between h-16">
+						<div class="flex items-center gap-8">
+							<a href="/" class="flex items-center gap-2 group">
+								<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center">
+									<svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+									</svg>
+								</div>
+								<span class="text-lg font-bold tracking-tight group-hover:text-accent-cyan transition-colors">ChatTogether</span>
 							</a>
 							{user && !isBanned && (
-								<div class="hidden md:flex gap-8">
-									<a href="/chat" class="text-xs font-black uppercase tracking-tighter hover:line-through">Messages</a>
-									<a href="/chat/rooms" class="text-xs font-black uppercase tracking-tighter hover:line-through">Communities</a>
-									<a href="/profile" class="text-xs font-black uppercase tracking-tighter hover:line-through">Profile</a>
+								<div class="hidden md:flex items-center gap-1">
+									<a href="/chat" class="px-3 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Messages</a>
+									<a href="/chat/rooms" class="px-3 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Communities</a>
+									<a href="/profile" class="px-3 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Profile</a>
 									{isAdmin && (
-										<a href="/admin" class="text-xs font-black uppercase tracking-tighter hover:line-through underline decoration-2">Admin</a>
+										<a href="/admin" class="px-3 py-2 text-sm font-medium text-accent-cyan hover:text-accent-cyan/80 bg-accent-cyan/10 rounded-lg transition-all">Admin</a>
 									)}
 								</div>
 							)}
 						</div>
-						<div class="flex items-center gap-6">
+						<div class="flex items-center gap-4">
 							{user ? (
-								<div class="flex items-center gap-6">
-									<span class="text-[10px] font-mono uppercase text-elite-neutral-400">{user.email}</span>
+								<div class="flex items-center gap-4">
+									<span class="hidden sm:block text-sm text-white/50 font-mono">{user.email?.split('@')[0]}</span>
 									<form action="/api/auth/signout" method="post">
-										<button type="submit" class="text-xs font-black uppercase tracking-tighter border-b-2 border-elite-black hover:bg-elite-black hover:text-white transition-all px-1">Log Out</button>
+										<button type="submit" class="btn-ghost text-sm">Sign Out</button>
 									</form>
 								</div>
 							) : (
-								<div class="flex items-center gap-4">
-									<a href="/login" class="text-xs font-black uppercase tracking-tighter hover:line-through">Login</a>
-									<a href="/signup" class="elite-button !py-2 !px-4 text-[10px]">Sign Up</a>
+								<div class="flex items-center gap-3">
+									<a href="/login" class="btn-ghost text-sm">Login</a>
+									<a href="/signup" class="btn-primary text-sm !py-2">Get Started</a>
 								</div>
 							)}
 						</div>
@@ -71,7 +76,7 @@ const isBanned = profile?.is_banned || false;
 			</nav>
 		)}
 
-		<main class="flex-1 overflow-hidden flex flex-col bg-elite-neutral-50/30">
+		<main class="flex-1 overflow-hidden flex flex-col mesh-bg">
 			<slot />
 		</main>
 	</body>
