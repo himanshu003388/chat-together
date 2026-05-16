@@ -198,8 +198,8 @@ export default function ChatApp({
 
   return (
     <div className="flex w-full h-full bg-surface-primary overflow-hidden">
-      {/* Sidebar - hidden on mobile when chat is open */}
-      <div className={`${showMobileList || !activeUserId ? 'w-full md:w-80' : 'hidden'} bg-surface-secondary border-r border-white/5 flex flex-col`}>
+      {/* Sidebar - always visible on desktop, toggleable on mobile */}
+      <div className={`${showMobileList || !activeUserId ? 'flex' : 'hidden md:flex'} w-full md:w-80 bg-surface-secondary border-r border-white/5 flex flex-col`}>
         <div className="p-4 border-b border-white/5">
           <h2 className="text-xl font-bold mb-4">Direct Nodes</h2>
           <div className="relative">
