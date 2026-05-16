@@ -38,6 +38,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // 4. User Profile & Authorization
   if (user) {
     try {
+      const ADMIN_EMAIL = 'himanshu003388@gmail.com';
+      const isAdminEmail = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
       // First try to get existing profile
       let { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -48,8 +51,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       // If profile doesn't exist, create one
       if (profileError && profileError.code === 'PGRST116') {
         const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
-        const ADMIN_EMAIL = 'himanshu003388@gmail.com';
-        const role = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user';
+        const role = isAdminEmail ? 'admin' : 'user';
 
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
@@ -67,6 +69,18 @@ export const onRequest = defineMiddleware(async (context, next) => {
         }
       } else if (profileError) {
         logger.error({ profileError }, 'Profile fetch error');
+      }
+
+      // Ensure admin email always has admin role
+      if (profile && isAdminEmail && profile.role !== 'admin') {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ role: 'admin' })
+          .eq('id', user.id);
+
+        if (!updateError) {
+          profile = { ...profile, role: 'admin' };
+        }
       }
 
       locals.profile = profile;
