@@ -137,11 +137,17 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
       })
       .subscribe();
 
+    // Fallback polling in case realtime doesn't work
+    const pollInterval = setInterval(() => {
+      fetchMessages();
+    }, 5000);
+
     return () => {
       supabase.removeChannel(messageChannel);
       supabase.removeChannel(reactionChannel);
       supabase.removeChannel(pinChannel);
       supabase.removeChannel(typingChannel);
+      clearInterval(pollInterval);
     };
   }, [roomId]);
 

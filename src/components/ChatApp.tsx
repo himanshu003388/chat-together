@@ -98,13 +98,19 @@ export default function ChatApp({
       })
       .subscribe();
 
+    // Fallback polling in case realtime doesn't work
+    const pollInterval = setInterval(() => {
+      fetchMessages();
+    }, 5000); // Poll every 5 seconds as backup
+
     updateLastSeen();
-    const interval = setInterval(updateLastSeen, 30000);
+    const lastSeenInterval = setInterval(updateLastSeen, 30000);
 
     return () => {
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(typingChannel);
-      clearInterval(interval);
+      clearInterval(pollInterval);
+      clearInterval(lastSeenInterval);
     };
   }, [activeUserId, currentUser.id]);
 

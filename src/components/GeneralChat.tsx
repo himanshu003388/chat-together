@@ -110,12 +110,18 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
       })
       .subscribe();
 
+    // Fallback polling in case realtime doesn't work
+    const pollInterval = setInterval(() => {
+      fetchMessages();
+    }, 5000);
+
     const presenceInterval = setInterval(updateOnlineStatus, 30000);
 
     return () => {
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(reactionChannel);
       supabase.removeChannel(pinChannel);
+      clearInterval(pollInterval);
       clearInterval(presenceInterval);
     };
   }, []);
