@@ -229,20 +229,42 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
       if (!fileData) return;
     }
 
-    const { error } = await supabase.from('messages').insert({
-      sender_id: currentUser.id,
-      content: newMessage.trim() || null,
-      reply_to: replyTo?.id || null,
-      file_url: fileData?.url || null,
-      file_name: fileData?.name || null,
-      file_type: fileData?.type || null,
-    });
+    try {
+      const { data, error } = await supabase.from('messages').insert({
+        sender_id: currentUser.id,
+        content: newMessage.trim() || null,
+        reply_to: replyTo?.id || null,
+        file_url: fileData?.url || null,
+        file_name: fileData?.name || null,
+        file_type: fileData?.type || null,
+      }).select();
 
-    if (!error) {
+      if (error) {
+        console.error('Message insert error:', error);
+        alert('Failed to send message: ' + error.message);
+        return;
+      }
+
+      // Manually add the new message to state
+      if (data && data[0]) {
+        const newMsg = data[0] as Message;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .eq('id', currentUser.id)
+          .single();
+        newMsg.profiles = profile;
+        newMsg.reactions = [];
+        setMessages(prev => [...prev, newMsg]);
+      }
+
       setNewMessage('');
       setReplyTo(null);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      console.error('Send message error:', err);
+      alert('Failed to send message');
     }
   };
 

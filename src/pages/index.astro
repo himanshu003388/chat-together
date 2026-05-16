@@ -8,9 +8,9 @@ const profile = Astro.locals.profile;
 const error = Astro.url.searchParams.get('error');
 ---
 
-<Layout title="ChatTogether" hideNav={!!user}>
+<Layout title="ChatTogether">
 	{user ? (
-		<div class="h-full flex flex-col bg-surface-primary overflow-hidden">
+		<div class="h-[calc(100vh-64px)] flex flex-col bg-surface-primary overflow-hidden">
 			{/* Main Content - just the chat component, nav is in Layout */}
 			<div class="flex-1 overflow-hidden">
 				<GeneralChat
