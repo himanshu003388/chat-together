@@ -201,13 +201,13 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
       const filePath = `${currentUser.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('messages')
+        .from('chat-attachments')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('messages')
+        .from('chat-attachments')
         .getPublicUrl(filePath);
 
       return { url: publicUrl, type: file.type, name: file.name };
@@ -235,8 +235,6 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
         content: newMessage.trim() || null,
         reply_to: replyTo?.id || null,
         file_url: fileData?.url || null,
-        file_name: fileData?.name || null,
-        file_type: fileData?.type || null,
       }).select();
 
       if (error) {
