@@ -345,7 +345,7 @@ export default function ChatApp({
               {loadingMessages ? (
                 <div className="h-full flex flex-col items-center justify-center gap-4">
                   <div className="w-12 h-12 border-2 border-accent-cyan/20 border-t-accent-cyan rounded-full animate-spin" />
-                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent-cyan animate-pulse">Decrypting secure channel...</div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent-cyan">Loading messages...</div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-6">
