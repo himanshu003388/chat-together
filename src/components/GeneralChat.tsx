@@ -188,6 +188,22 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
         fileInfo
       );
 
+      // Optimistic update - add message immediately
+      const newMsg: Message = {
+        id: Date.now().toString() + Math.random().toString(36).substring(7),
+        sender_id: currentUser.id,
+        receiver_id: null,
+        content: newMessage.trim() || null,
+        file_url: fileInfo?.url || null,
+        file_name: fileInfo?.name || null,
+        file_type: fileInfo?.type || null,
+        reply_to: replyTo?.id || null,
+        created_at: new Date().toISOString(),
+        profiles: { id: currentUser.id, username: currentUser.username || 'You', avatar_url: null },
+        reactions: []
+      };
+      setMessages(prev => [...prev, newMsg]);
+
       setNewMessage('');
       setReplyTo(null);
       setSelectedFile(null);

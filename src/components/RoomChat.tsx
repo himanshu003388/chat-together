@@ -214,6 +214,19 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
 
     const content = newMessage;
     const replyId = replyingTo?.id || null;
+
+    // Optimistic update - add message immediately
+    const newMsg: Message = {
+      id: Date.now().toString() + Math.random().toString(36).substring(7),
+      content: content,
+      sender_id: currentUser.id,
+      chat_id: roomId,
+      created_at: new Date().toISOString(),
+      profiles: { id: currentUser.id, username: currentUser.username || 'You', avatar_url: null },
+      reactions: []
+    };
+    setMessages(prev => [...prev, newMsg]);
+
     setNewMessage('');
     setReplyingTo(null);
 

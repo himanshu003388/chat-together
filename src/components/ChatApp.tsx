@@ -159,7 +159,20 @@ export default function ChatApp({
       }
 
       await chatService.sendMessage(currentUser.id, newMessage.trim() || null, null, activeUserId, null, fileInfo);
-      
+
+      // Optimistic update - add message immediately
+      const newMsg: Message = {
+        id: Date.now().toString() + Math.random().toString(36).substring(7),
+        sender_id: currentUser.id,
+        receiver_id: activeUserId,
+        content: newMessage.trim() || '',
+        created_at: new Date().toISOString(),
+        file_url: fileInfo?.url,
+        file_name: fileInfo?.name,
+        file_type: fileInfo?.type
+      };
+      setMessages(prev => [...prev, newMsg]);
+
       setNewMessage('');
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
