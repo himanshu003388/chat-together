@@ -34,9 +34,9 @@ CREATE POLICY "Public profiles are viewable by everyone."
   ON public.profiles FOR SELECT
   USING ( true );
 
-CREATE POLICY "Users can insert their own profile."
+CREATE POLICY "Authenticated users can insert profiles."
   ON public.profiles FOR INSERT
-  WITH CHECK ( auth.uid() = id );
+  WITH CHECK ( auth.role() = 'authenticated' );
 
 CREATE POLICY "Users can update own profile."
   ON public.profiles FOR UPDATE
@@ -48,13 +48,13 @@ CREATE POLICY "Users can update own last_seen."
   WITH CHECK ( auth.uid() = id );
 
 -- Messages Policies
-CREATE POLICY "Users can insert their own messages."
+CREATE POLICY "Authenticated users can insert messages."
   ON public.messages FOR INSERT
-  WITH CHECK ( auth.uid() = sender_id );
+  WITH CHECK ( auth.role() = 'authenticated' );
 
-CREATE POLICY "Users can view messages they sent or received or general messages."
+CREATE POLICY "Anyone can view messages."
   ON public.messages FOR SELECT
-  USING ( auth.uid() = sender_id OR auth.uid() = receiver_id OR receiver_id IS NULL );
+  USING ( true );
 
 CREATE POLICY "Users can update their received messages (to mark as read)."
   ON public.messages FOR UPDATE
@@ -89,9 +89,13 @@ CREATE POLICY "Chat attachments are publicly accessible."
   ON storage.objects FOR SELECT
   USING ( bucket_id = 'chat-attachments' );
 
-CREATE POLICY "Authenticated users can upload chat attachments."
+CREATE POLICY "Anyone can upload chat attachments."
   ON storage.objects FOR INSERT
-  WITH CHECK ( bucket_id = 'chat-attachments' AND auth.role() = 'authenticated' );
+  WITH CHECK ( bucket_id = 'chat-attachments' );
+
+CREATE POLICY "Anyone can update chat attachments."
+  ON storage.objects FOR UPDATE
+  USING ( bucket_id = 'chat-attachments' );
 
 -- Function to handle new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
