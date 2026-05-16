@@ -1,10 +1,15 @@
 -- ==========================================
--- Fix: Add missing columns to messages (safe for existing DB)
+-- Fix: Add missing columns to messages and fix constraints (safe for existing DB)
 -- ==========================================
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_name TEXT;
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_type TEXT;
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS file_url TEXT;
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS reply_to UUID REFERENCES public.messages(id) ON DELETE SET NULL;
+
+-- Make these columns nullable (for room chats where receiver_id is not needed)
+ALTER TABLE public.messages ALTER COLUMN receiver_id DROP NOT NULL;
+ALTER TABLE public.messages ALTER COLUMN chat_id DROP NOT NULL;
+ALTER TABLE public.messages ALTER COLUMN content DROP NOT NULL;
 
 -- ==========================================
 -- 1. TABLES (Use IF NOT EXISTS for existing databases)
