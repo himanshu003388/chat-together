@@ -6,7 +6,6 @@ import {
   Send, Paperclip, MoreVertical, Hash, ChevronLeft, Smile, Reply as ReplyIcon,
   X, CornerDownRight, Pin, File as FileIcon, Download, Cpu, Zap, Shield
 } from 'lucide-react';
-import ThreeBackground from './ThreeBackground';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -68,7 +67,6 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
   const [otherUserTyping, setOtherUserTyping] = useState<string | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<string>('connecting');
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [pulse, setPulse] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -216,9 +214,6 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
     e.preventDefault();
     if (!newMessage.trim()) return;
 
-    setPulse(true);
-    setTimeout(() => setPulse(false), 500);
-
     const content = newMessage;
     const replyId = replyingTo?.id || null;
 
@@ -302,9 +297,7 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
   const getFileUrl = (path: string) => `${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/chat-attachments/${path}`;
 
   return (
-    <div className="flex flex-col h-full bg-surface-primary/20 backdrop-blur-[2px] overflow-hidden relative noise-overlay">
-      <ThreeBackground pulse={pulse} />
-      
+    <div className="flex flex-col h-full bg-surface-primary overflow-hidden relative">
       {/* Header */}
       <div className="p-4 sm:p-6 glass-dark border-b border-white/5 relative z-10 bg-black/40">
         <div className="flex items-center justify-between">

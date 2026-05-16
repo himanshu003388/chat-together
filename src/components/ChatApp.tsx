@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabaseBrowser';
 import { ChatService } from '../services/chat.service';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Send, MoreVertical, Check, CheckCheck, Phone, Video, Paperclip, X, FileText, Download, ChevronLeft, MessageCircle, Zap, Shield, Cpu } from 'lucide-react';
-import ThreeBackground from './ThreeBackground';
 import TiltCard from './TiltCard';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -58,7 +57,6 @@ export default function ChatApp({
   const [showProfileModal, setShowProfileModal] = useState<Profile | null>(null);
   const [showMobileList, setShowMobileList] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<string>('connecting');
-  const [pulse, setPulse] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,9 +170,6 @@ export default function ChatApp({
     e.preventDefault();
     if ((!newMessage.trim() && !selectedFile) || !activeUserId || uploading) return;
 
-    setPulse(true);
-    setTimeout(() => setPulse(false), 500);
-
     setUploading(true);
     try {
       let fileInfo = null;
@@ -224,9 +219,7 @@ export default function ChatApp({
   };
 
   return (
-    <div className="flex w-full h-full bg-surface-primary/20 backdrop-blur-[2px] overflow-hidden relative noise-overlay">
-      <ThreeBackground pulse={pulse} />
-      
+    <div className="flex w-full h-full bg-surface-primary overflow-hidden relative">
       {/* Sidebar */}
       <div className={cn(
         "z-10 w-full md:w-96 glass-dark border-r border-white/5 flex flex-col transition-all duration-500",

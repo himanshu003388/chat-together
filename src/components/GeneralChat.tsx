@@ -6,7 +6,6 @@ import {
   Send, Paperclip, FileText, X, Download,
   MessageCircle, Pin, Trash2, Edit3, Search, Smile, Cpu, Zap, Shield, ChevronLeft
 } from 'lucide-react';
-import ThreeBackground from './ThreeBackground';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -67,7 +66,6 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<string>('connecting');
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [pulse, setPulse] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -180,9 +178,6 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
     e.preventDefault();
     if (!newMessage.trim() && !selectedFile) return;
 
-    setPulse(true);
-    setTimeout(() => setPulse(false), 500);
-
     setUploading(true);
     try {
       let fileInfo = null;
@@ -293,9 +288,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   const pinnedList = messages.filter(m => pinnedMessages.includes(m.id));
 
   return (
-    <div className="flex flex-col h-full bg-surface-primary/20 backdrop-blur-[2px] overflow-hidden relative noise-overlay">
-      <ThreeBackground pulse={pulse} />
-      
+    <div className="flex flex-col h-full bg-surface-primary overflow-hidden relative">
       {/* Header */}
       <div className="p-4 sm:p-6 glass-dark border-b border-white/5 relative z-10 bg-black/40">
         <div className="flex items-center justify-between">
