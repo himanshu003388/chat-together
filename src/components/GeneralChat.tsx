@@ -70,16 +70,35 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
     fetchPinnedMessages();
     updateOnlineStatus();
 
-    const channel = supabase
-      .channel('general-chat-realtime')
+    // Subscribe to new general messages (no receiver_id = general chat)
+    const messageChannel = supabase
+      .channel('general-messages')
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'messages',
         filter: 'receiver_id=is.null'
       }, () => {
-        fetchMessages(); // Simple refresh for consistency, can be optimized later
+        fetchMessages();
       })
+      .subscribe();
+
+    // Subscribe to message updates
+    const updateChannel = supabase
+      .channel('general-message-updates')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: 'receiver_id=is.null'
+      }, () => {
+        fetchMessages();
+      })
+      .subscribe();
+
+    // Subscribe to reactions
+    const reactionChannel = supabase
+      .channel('general-reactions')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -87,6 +106,11 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
       }, () => {
         fetchMessages();
       })
+      .subscribe();
+
+    // Subscribe to pinned messages
+    const pinChannel = supabase
+      .channel('general-pins')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -99,7 +123,10 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
     const presenceInterval = setInterval(updateOnlineStatus, 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(updateChannel);
+      supabase.removeChannel(reactionChannel);
+      supabase.removeChannel(pinChannel);
       clearInterval(presenceInterval);
     };
   }, []);
@@ -188,9 +215,10 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
         fileInfo
       );
 
-      // Optimistic update - add message immediately
+      // Optimistic update - add message immediately with temp ID
+      const tempId = 'temp-' + Date.now().toString() + Math.random().toString(36).substring(7);
       const newMsg: Message = {
-        id: Date.now().toString() + Math.random().toString(36).substring(7),
+        id: tempId,
         sender_id: currentUser.id,
         receiver_id: null,
         content: newMessage.trim() || null,
@@ -203,6 +231,9 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
         reactions: []
       };
       setMessages(prev => [...prev, newMsg]);
+
+      // Fetch updated messages to get the real message from server
+      fetchMessages();
 
       setNewMessage('');
       setReplyTo(null);

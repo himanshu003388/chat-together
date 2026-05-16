@@ -70,19 +70,35 @@ export default function ChatApp({
   }, [activeUserId]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`direct-chat-${currentUser.id}`)
+    // Subscribe to messages where user is sender
+    const senderChannel = supabase
+      .channel(`direct-chat-sender-${currentUser.id}`)
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'messages',
-        filter: `or(receiver_id.eq.${currentUser.id},sender_id.eq.${currentUser.id})`
-      }, (payload) => {
-        const msg = payload.new as Message;
-        if (msg.sender_id === activeUserId || msg.receiver_id === activeUserId) {
-          fetchMessages();
-        }
+        filter: `sender_id=eq.${currentUser.id}`
+      }, () => {
+        fetchMessages();
       })
+      .subscribe();
+
+    // Subscribe to messages where user is receiver
+    const receiverChannel = supabase
+      .channel(`direct-chat-receiver-${currentUser.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `receiver_id=eq.${currentUser.id}`
+      }, () => {
+        fetchMessages();
+      })
+      .subscribe();
+
+    // Typing indicator channel
+    const typingChannel = supabase
+      .channel(`direct-typing-${currentUser.id}`)
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         if (payload.userId === activeUserId) {
           setOtherUserTyping(payload.typing);
@@ -94,7 +110,9 @@ export default function ChatApp({
     const interval = setInterval(updateLastSeen, 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(senderChannel);
+      supabase.removeChannel(receiverChannel);
+      supabase.removeChannel(typingChannel);
       clearInterval(interval);
     };
   }, [activeUserId, currentUser.id]);
@@ -162,9 +180,10 @@ export default function ChatApp({
 
       await chatService.sendMessage(currentUser.id, newMessage.trim() || null, null, activeUserId, null, fileInfo);
 
-      // Optimistic update - add message immediately
+      // Optimistic update - add message immediately with a temporary ID
+      const tempId = 'temp-' + Date.now().toString() + Math.random().toString(36).substring(7);
       const newMsg: Message = {
-        id: Date.now().toString() + Math.random().toString(36).substring(7),
+        id: tempId,
         sender_id: currentUser.id,
         receiver_id: activeUserId,
         content: newMessage.trim() || '',
@@ -174,6 +193,10 @@ export default function ChatApp({
         file_type: fileInfo?.type
       };
       setMessages(prev => [...prev, newMsg]);
+
+      // Fetch updated messages to get the real message from the server
+      // This will also remove the temp message and show the real one
+      fetchMessages();
 
       setNewMessage('');
       setSelectedFile(null);

@@ -215,9 +215,10 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
     const content = newMessage;
     const replyId = replyingTo?.id || null;
 
-    // Optimistic update - add message immediately
+    // Optimistic update - add message immediately with temp ID
+    const tempId = 'temp-' + Date.now().toString() + Math.random().toString(36).substring(7);
     const newMsg: Message = {
-      id: Date.now().toString() + Math.random().toString(36).substring(7),
+      id: tempId,
       content: content,
       sender_id: currentUser.id,
       chat_id: roomId,
@@ -232,6 +233,8 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
 
     try {
       await chatService.sendMessage(currentUser.id, content, roomId, null, replyId);
+      // Refresh messages to get the real message from server (replaces temp message)
+      fetchMessages();
     } catch (err) {
       console.error('Failed to send:', err);
     }
