@@ -1,88 +1,101 @@
 import { defineMiddleware } from "astro:middleware";
 import { supabaseClient } from "./lib/supabase";
+import { logger } from "./utils/logger";
 
 const protectedRoutes = ["/profile", "/chat", "/admin"];
 
 export const onRequest = defineMiddleware(async (context, next) => {
+  const { url, request, locals } = context;
+  const start = Date.now();
+
+  // 1. Logger Middleware (Simplified for Astro)
+  logger.info({
+    method: request.method,
+    url: url.pathname,
+    ip: request.headers.get("x-forwarded-for") || "unknown",
+  });
+
+  // 2. Supabase Client Initialization
   let supabase;
   try {
     supabase = supabaseClient(context);
+    locals.supabase = supabase;
   } catch (err) {
-    console.error('Supabase initialization failed:', err);
-    return new Response('Service unavailable - configuration error', { status: 500 });
+    logger.error({ err }, 'Supabase initialization failed');
+    return new Response('Service unavailable', { status: 503 });
   }
 
-  // Set supabase client to locals
-  context.locals.supabase = supabase;
+  // 3. Authentication
+  const { data: { user } } = await supabase.auth.getUser();
+  locals.user = user;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const isProtectedRoute = protectedRoutes.some(route => url.pathname.startsWith(route));
 
-  // Set user to locals
-  context.locals.user = user;
+  if (isProtectedRoute && !user) {
+    return context.redirect("/login");
+  }
 
-  const url = new URL(context.request.url);
-
-  // If user is logged in, fetch their profile
+  // 4. User Profile & Authorization
   if (user) {
-    let profile = null;
     try {
-      const { data } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
-      profile = data;
+      
+      let currentProfile = profile;
 
-      // Create profile if it doesn't exist
-      if (!profile && user.email) {
+      // Auto-create profile if missing
+      if (!currentProfile && user.email) {
         const username = user.user_metadata?.username || user.email.split('@')[0];
-        const { data: newProfile, error } = await supabase.from('profiles').insert({
-          id: user.id,
-          username,
-          email: user.email,
-          role: 'user',
-        }).select().single();
+        const ADMIN_EMAIL = 'himanshu003388@gmail.com';
+        const role = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'user';
 
-        if (!error) {
-          profile = newProfile;
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            username,
+            email: user.email,
+            role,
+          })
+          .select()
+          .single();
+
+        if (!insertError) {
+          currentProfile = newProfile;
         }
       }
-    } catch (err) {
-      console.error('Profile fetch error:', err);
-    }
 
-    // Set profile to locals
-    context.locals.profile = profile;
+      locals.profile = currentProfile;
 
-    // Check if user is banned
-    if (profile?.is_banned && protectedRoutes.some(route => url.pathname.startsWith(route))) {
-      // Allow signout even if banned
-      if (url.pathname !== '/api/auth/signout') {
-        // We can either redirect to a banned page or just let the Layout handle it
-        // For now, let's just let it pass and let Layout show the banner, 
-        // but maybe restrict /chat and /admin
-        if (url.pathname.startsWith('/chat') || url.pathname.startsWith('/admin')) {
+      // Banned user check
+      if (currentProfile?.is_banned && isProtectedRoute) {
+        if (!url.pathname.includes('/api/auth/signout')) {
           return context.redirect("/?error=Your account is banned");
         }
       }
-    }
 
-    // Admin route protection
-    if (url.pathname.startsWith("/admin") && profile?.role !== 'admin') {
-      return context.redirect("/");
+      // Admin route protection
+      if (url.pathname.startsWith("/admin") && currentProfile?.role !== 'admin') {
+        return context.redirect("/");
+      }
+    } catch (err) {
+      logger.error({ err }, 'Profile processing error');
     }
   }
 
-  // Check if route is protected
-  const isProtected = protectedRoutes.some((route) =>
-    url.pathname.startsWith(route)
-  );
+  const response = await next();
+  
+  // Log duration
+  const duration = Date.now() - start;
+  logger.info({
+    method: request.method,
+    url: url.pathname,
+    status: response.status,
+    duration: `${duration}ms`,
+  });
 
-  if (isProtected && !user) {
-    return context.redirect("/login");
-  }
-
-  return next();
+  return response;
 });

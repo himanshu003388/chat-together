@@ -1,74 +1,36 @@
 import type { APIRoute } from "astro";
+import { loginSchema } from "../../../utils/validation";
+import { AuthService } from "../../../services/auth.service";
+import { logger } from "../../../utils/logger";
+import { AppError } from "../../../utils/errors";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
-  const formData = await request.formData();
-  const email = formData.get("email")?.toString();
-  const password = formData.get("password")?.toString();
+  try {
+    const formData = await request.formData();
+    const email = formData.get("email")?.toString();
+    const password = formData.get("password")?.toString();
 
-  if (!email || !password) {
-    return redirect("/login?error=Email and password are required");
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return redirect("/login?error=Please enter a valid email address");
-  }
-
-  const { data, error } = await locals.supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) {
-    const errorMessage = error.message.toLowerCase();
-    if (errorMessage.includes('invalid login') || errorMessage.includes('invalid credentials') || errorMessage.includes('invalid')) {
-      return redirect("/login?error=Invalid email or password");
+    const validated = loginSchema.safeParse({ email, password });
+    if (!validated.success) {
+      return redirect(`/login?error=${encodeURIComponent(validated.error.issues[0].message)}`);
     }
-    if (errorMessage.includes('email not confirmed')) {
-      return redirect(`/login?error=Please confirm your email address first&email=${encodeURIComponent(email)}`);
-    }
-    if (errorMessage.includes('too many requests')) {
-      return redirect("/login?error=Too many attempts. Please try again later.");
-    }
-    return redirect(`/login?error=${encodeURIComponent(error.message)}`);
-  }
 
-  if (data.user) {
-    const { data: profile } = await locals.supabase
-      .from('profiles')
-      .select('id, is_banned')
-      .eq('id', data.user.id)
-      .maybeSingle();
+    const authService = new AuthService(locals.supabase);
+    await authService.signIn(validated.data.email, validated.data.password);
 
-    if (!profile) {
-      const username = data.user.user_metadata?.username || data.user.email?.split('@')[0];
-      const { error: profileError } = await locals.supabase.from('profiles').insert({
-        id: data.user.id,
-        username: username?.toLowerCase() || email.split('@')[0].toLowerCase(),
-        email: email.toLowerCase(),
-        role: 'user',
-      });
-
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-        return redirect("/login?error=Failed to load user profile");
+    logger.info({ email: validated.data.email }, "User signed in");
+    return redirect("/");
+  } catch (err) {
+    if (err instanceof AppError) {
+      const msg = err.message.toLowerCase();
+      if (msg.includes('confirm your email')) {
+        const formData = await request.clone().formData();
+        const email = formData.get("email")?.toString();
+        return redirect(`/login?error=${encodeURIComponent(err.message)}&email=${encodeURIComponent(email || '')}`);
       }
-
-      const { data: newProfile } = await locals.supabase
-        .from('profiles')
-        .select('is_banned')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      if (newProfile?.is_banned) {
-        await locals.supabase.auth.signOut();
-        return redirect("/login?error=Your account has been banned");
-      }
-    } else if (profile.is_banned) {
-      await locals.supabase.auth.signOut();
-      return redirect("/login?error=Your account has been banned");
+      return redirect(`/login?error=${encodeURIComponent(err.message)}`);
     }
+    logger.error(err, "Unexpected error in sign-in route");
+    return redirect("/login?error=An unexpected error occurred");
   }
-
-  return redirect("/");
 };

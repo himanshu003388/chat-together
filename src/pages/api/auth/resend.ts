@@ -1,34 +1,29 @@
-import type { APIRoute } from 'astro';
+import type { APIRoute } from "astro";
+import { resendSchema } from "../../../utils/validation";
+import { AuthService } from "../../../services/auth.service";
+import { logger } from "../../../utils/logger";
+import { AppError } from "../../../utils/errors";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
-  const formData = await request.formData();
-  const email = formData.get('email')?.toString();
+  try {
+    const formData = await request.formData();
+    const email = formData.get("email")?.toString();
 
-  if (!email) {
-    return redirect('/login?error=Email is required to resend confirmation');
-  }
-
-  // Basic email format validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return redirect('/login?error=Please enter a valid email address');
-  }
-
-  const { error } = await locals.supabase.auth.resend({
-    type: 'signup',
-    email,
-  });
-
-  if (error) {
-    const errorMessage = error.message.toLowerCase();
-    if (errorMessage.includes('too many requests')) {
-      return redirect('/login?error=Too many requests. Please wait a moment before trying again.');
+    const validated = resendSchema.safeParse({ email });
+    if (!validated.success) {
+      return redirect(`/login?error=${encodeURIComponent(validated.error.issues[0].message)}`);
     }
-    if (errorMessage.includes('email not found') || errorMessage.includes('not found')) {
-      return redirect('/login?error=No account found with this email');
-    }
-    return redirect(`/login?error=${encodeURIComponent(error.message)}&email=${encodeURIComponent(email)}`);
-  }
 
-  return redirect('/login?message=Confirmation email resent. Please check your inbox.&email=' + encodeURIComponent(email));
+    const authService = new AuthService(locals.supabase);
+    await authService.resendConfirmation(validated.data.email);
+
+    return redirect(`/login?message=Confirmation email resent. Please check your inbox.&email=${encodeURIComponent(validated.data.email)}`);
+  } catch (err) {
+    if (err instanceof AppError) {
+      const email = (await request.clone().formData()).get("email")?.toString() || "";
+      return redirect(`/login?error=${encodeURIComponent(err.message)}&email=${encodeURIComponent(email)}`);
+    }
+    logger.error(err, "Unexpected error in resend route");
+    return redirect("/login?error=An unexpected error occurred");
+  }
 };

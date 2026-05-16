@@ -1,14 +1,18 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import { ProfileService } from '../../services/profile.service';
+import { profileSchema } from '../../utils/validation';
+import { logger } from '../../utils/logger';
 
 const user = Astro.locals.user;
 const supabase = Astro.locals.supabase;
 
-const { data: profile } = await supabase
-  .from('profiles')
-  .select('*')
-  .eq('id', user?.id)
-  .maybeSingle();
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profileService = new ProfileService(supabase);
+let profile = await profileService.getProfile(user.id);
 
 let errorMessage = '';
 
@@ -19,30 +23,30 @@ if (Astro.request.method === 'POST') {
     const bio = formData.get('bio')?.toString();
     const avatarFile = formData.get('avatar') as File;
 
-    let avatar_url = profile?.avatar_url;
-
-    if (avatarFile && avatarFile.size > 0) {
-      const fileExt = avatarFile.name.split('.').pop();
-      const fileName = `${user?.id}-${Math.random()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, avatarFile);
-
-      if (uploadError) throw uploadError;
-
-      avatar_url = fileName;
+    // 1. Validation
+    const validated = profileSchema.safeParse({ username, bio });
+    if (!validated.success) {
+      throw new Error(validated.error.issues[0].message);
     }
 
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ username, bio, avatar_url })
-      .eq('id', user?.id);
+    let avatar_url = profile?.avatar_url;
 
-    if (updateError) throw updateError;
+    // 2. Handle File Upload
+    if (avatarFile && avatarFile.size > 0) {
+      avatar_url = await profileService.uploadAvatar(user.id, avatarFile);
+    }
 
+    // 3. Update Profile
+    await profileService.updateProfile(user.id, {
+      username: validated.data.username,
+      bio: validated.data.bio,
+      avatar_url
+    });
+
+    logger.info({ userId: user.id }, 'Profile updated');
     return Astro.redirect('/profile');
   } catch (error: any) {
+    logger.warn({ userId: user.id, error: error.message }, 'Profile update failed');
     errorMessage = error.message;
   }
 }
