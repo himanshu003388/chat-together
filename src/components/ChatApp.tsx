@@ -70,35 +70,27 @@ export default function ChatApp({
   }, [activeUserId]);
 
   useEffect(() => {
-    // Subscribe to messages where user is sender
-    const senderChannel = supabase
-      .channel(`direct-chat-sender-${currentUser.id}`)
+    // Subscribe to all messages involving this user (sender OR receiver)
+    const messagesChannel = supabase
+      .channel('direct-messages-all')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'messages',
-        filter: `sender_id=eq.${currentUser.id}`
-      }, () => {
-        fetchMessages();
+        table: 'messages'
+      }, (payload) => {
+        const msg = payload.new as Message;
+        // Only fetch if this message involves current user
+        if (msg.sender_id === currentUser.id || msg.receiver_id === currentUser.id) {
+          fetchMessages();
+        }
       })
-      .subscribe();
-
-    // Subscribe to messages where user is receiver
-    const receiverChannel = supabase
-      .channel(`direct-chat-receiver-${currentUser.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `receiver_id=eq.${currentUser.id}`
-      }, () => {
-        fetchMessages();
-      })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Messages channel status:', status);
+      });
 
     // Typing indicator channel
     const typingChannel = supabase
-      .channel(`direct-typing-${currentUser.id}`)
+      .channel('direct-typing-all')
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         if (payload.userId === activeUserId) {
           setOtherUserTyping(payload.typing);
@@ -110,8 +102,7 @@ export default function ChatApp({
     const interval = setInterval(updateLastSeen, 30000);
 
     return () => {
-      supabase.removeChannel(senderChannel);
-      supabase.removeChannel(receiverChannel);
+      supabase.removeChannel(messagesChannel);
       supabase.removeChannel(typingChannel);
       clearInterval(interval);
     };

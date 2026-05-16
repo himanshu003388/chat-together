@@ -70,29 +70,19 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
     fetchPinnedMessages();
     updateOnlineStatus();
 
-    // Subscribe to new general messages (no receiver_id = general chat)
-    const messageChannel = supabase
-      .channel('general-messages')
+    // Subscribe to all messages and filter client-side
+    const messagesChannel = supabase
+      .channel('general-messages-all')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'messages',
-        filter: 'receiver_id=is.null'
-      }, () => {
-        fetchMessages();
-      })
-      .subscribe();
-
-    // Subscribe to message updates
-    const updateChannel = supabase
-      .channel('general-message-updates')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'messages',
-        filter: 'receiver_id=is.null'
-      }, () => {
-        fetchMessages();
+        table: 'messages'
+      }, (payload) => {
+        const msg = payload.new as Message;
+        // Only fetch for general chat (no receiver_id and no chat_id)
+        if (!msg.receiver_id && !msg.chat_id) {
+          fetchMessages();
+        }
       })
       .subscribe();
 
@@ -123,8 +113,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
     const presenceInterval = setInterval(updateOnlineStatus, 30000);
 
     return () => {
-      supabase.removeChannel(messageChannel);
-      supabase.removeChannel(updateChannel);
+      supabase.removeChannel(messagesChannel);
       supabase.removeChannel(reactionChannel);
       supabase.removeChannel(pinChannel);
       clearInterval(presenceInterval);

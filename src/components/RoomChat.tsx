@@ -79,33 +79,35 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
     fetchMessages();
     fetchPins();
 
-    // 1. Message Subscription
+    // 1. Message Subscription - listen to all and filter client-side
     const messageChannel = supabase
       .channel(`room-messages-${roomId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'messages',
-        filter: `chat_id=eq.${roomId}`
+        table: 'messages'
       }, async (payload) => {
         const newMsg = payload.new as Message;
-        const { data: profile } = await supabase
-          .from('profiles').select('id, username, avatar_url')
-          .eq('id', newMsg.sender_id).single();
-        
-        newMsg.profiles = profile || undefined;
-        newMsg.reactions = [];
+        // Only process if this message is for this room
+        if (newMsg.chat_id === roomId) {
+          const { data: profile } = await supabase
+            .from('profiles').select('id, username, avatar_url')
+            .eq('id', newMsg.sender_id).single();
 
-        if (newMsg.reply_to) {
-          const { data: parent } = await supabase
-            .from('messages')
-            .select('content, profiles:sender_id(username)')
-            .eq('id', newMsg.reply_to)
-            .single();
-          newMsg.reply_message = parent as any;
+          newMsg.profiles = profile || undefined;
+          newMsg.reactions = [];
+
+          if (newMsg.reply_to) {
+            const { data: parent } = await supabase
+              .from('messages')
+              .select('content, profiles:sender_id(username)')
+              .eq('id', newMsg.reply_to)
+              .single();
+            newMsg.reply_message = parent as any;
+          }
+
+          setMessages(prev => [...prev, newMsg]);
         }
-
-        setMessages(prev => [...prev, newMsg]);
       })
       .subscribe();
 
