@@ -367,9 +367,9 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
               <div className="flex items-center gap-2 mt-1">
                 <div className={cn("w-2 h-2 rounded-full", realtimeStatus === 'SUBSCRIBED' ? "bg-accent-emerald animate-pulse" : "bg-accent-pink")}></div>
                 <p className="text-[10px] text-white/40 font-mono uppercase tracking-[0.2em]">
-                  {onlineUsersCount} NODES CONNECTED
+                  {onlineUsersCount} Online Members
                   <span className={cn("ml-2 opacity-100", realtimeStatus === 'SUBSCRIBED' ? "text-accent-emerald" : "text-accent-pink")}>
-                    [{realtimeStatus.toUpperCase()}]
+                    [{realtimeStatus === 'SUBSCRIBED' ? 'LIVE' : 'CONNECTING'}]
                   </span>
                 </p>
               </div>
@@ -396,7 +396,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
                 type="text" 
                 value={searchQuery} 
                 onChange={(e) => searchMessages(e.target.value)} 
-                placeholder="Scan history for keywords..." 
+                placeholder="Search messages..." 
                 className="input-glass !bg-black/60 !py-3 !pl-12 text-sm border-white/5" 
               />
             </div>
@@ -573,7 +573,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
               type="text" 
               value={newMessage} 
               onChange={(e) => setNewMessage(e.target.value)} 
-              placeholder={uploading ? "Broadcasting to Hall..." : "Enter transmission..."} 
+              placeholder={uploading ? "Sending..." : "Type a message..."} 
               className="input-glass !bg-black/60 !py-4 !px-6 text-base !border-white/10 focus:!border-accent-cyan/50 focus:!ring-accent-cyan/10 transition-all placeholder:text-white/20" 
               disabled={uploading} 
             />
@@ -606,7 +606,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
               <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
                 <div className="flex items-center gap-3">
                   <Pin className="w-5 h-5 text-accent-cyan" />
-                  <h3 className="font-bold text-lg tracking-tighter uppercase italic">Pinned Stream</h3>
+                  <h3 className="font-bold text-lg tracking-tighter uppercase italic">Pinned Messages</h3>
                 </div>
                 <button onClick={() => setShowPinned(false)} className="p-2.5 hover:bg-white/5 rounded-xl text-white/40 hover:text-white transition-all"><X className="w-5 h-5" /></button>
               </div>

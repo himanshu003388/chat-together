@@ -327,9 +327,9 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
               <div className="flex items-center gap-2 mt-1">
                 <div className={cn("w-2 h-2 rounded-full", realtimeStatus === 'SUBSCRIBED' ? "bg-accent-emerald animate-pulse" : "bg-accent-pink")}></div>
                 <p className="text-[10px] text-white/40 font-mono uppercase tracking-[0.2em]">
-                  Real-time Data Stream 
+                  Live Chat
                   <span className={cn("ml-2 opacity-100", realtimeStatus === 'SUBSCRIBED' ? "text-accent-emerald" : "text-accent-pink")}>
-                    [{realtimeStatus.toUpperCase()}]
+                    [{realtimeStatus === 'SUBSCRIBED' ? 'ONLINE' : 'CONNECTING'}]
                   </span>
                 </p>
               </div>
@@ -360,7 +360,7 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
               <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
                 <div className="flex items-center gap-3">
                   <Pin className="w-5 h-5 text-accent-purple" />
-                  <h3 className="font-bold text-lg tracking-tighter uppercase italic">Pinned Stream</h3>
+                  <h3 className="font-bold text-lg tracking-tighter uppercase italic">Pinned Messages</h3>
                 </div>
                 <button onClick={() => setShowPins(false)} className="p-2.5 hover:bg-white/5 rounded-xl text-white/40 hover:text-white transition-all"><X className="w-5 h-5" /></button>
               </div>
@@ -569,7 +569,7 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
               type="text" 
               value={newMessage} 
               onChange={handleTyping} 
-              placeholder={uploading ? "Uploading data burst..." : `Message #${roomName}...`} 
+              placeholder={uploading ? "Sending..." : `Message ${roomName}...`} 
               className="input-glass !bg-black/60 !py-4 !px-6 text-base !border-white/10 focus:!border-accent-purple/50 focus:!ring-accent-purple/10 transition-all placeholder:text-white/20" 
               disabled={uploading} 
             />

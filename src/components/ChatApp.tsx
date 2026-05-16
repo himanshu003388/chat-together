@@ -251,7 +251,7 @@ export default function ChatApp({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-accent-cyan transition-colors" />
             <input 
               type="text" 
-              placeholder="Scan for active nodes..." 
+              placeholder="Search users..." 
               value={searchQuery} 
               onChange={(e) => setSearchQuery(e.target.value)} 
               className="input-glass !bg-black/40 text-sm pl-10 py-3 border-white/5 hover:border-white/10 transition-all" 
@@ -327,7 +327,7 @@ export default function ChatApp({
                   <div className="flex items-center gap-2">
                     <Zap className={cn("w-3 h-3", isOnline(activeUserProfile.last_seen) ? "text-accent-emerald animate-pulse" : "text-white/20")} />
                     <p className="text-[10px] text-white/40 uppercase tracking-widest font-mono">
-                      {isOnline(activeUserProfile.last_seen) ? 'Secure Link Active' : 'Signal Lost / Inactive'}
+                      {isOnline(activeUserProfile.last_seen) ? 'Online' : 'Offline'}
                     </p>
                   </div>
                 </div>
@@ -461,7 +461,7 @@ export default function ChatApp({
                     type="text" 
                     value={newMessage} 
                     onChange={handleTyping} 
-                    placeholder="Type your transmission..." 
+                    placeholder="Type a message..." 
                     className="input-glass !bg-black/60 !py-4 !px-6 text-base !border-white/10 focus:!border-accent-cyan/50 focus:!ring-accent-cyan/10 transition-all placeholder:text-white/20" 
                     disabled={uploading} 
                   />
@@ -503,10 +503,10 @@ export default function ChatApp({
                 <Cpu className="w-16 h-16 text-accent-cyan animate-pulse" />
               </div>
             </div>
-            <h3 className="text-3xl font-bold tracking-tighter uppercase italic mb-4">Signal Hub</h3>
-            <p className="text-white/40 text-sm leading-relaxed mb-8">Select an active node from the sidebar to establish a secure, encrypted communication channel.</p>
+            <h3 className="text-3xl font-bold tracking-tighter uppercase italic mb-4">Messages</h3>
+            <p className="text-white/40 text-sm leading-relaxed mb-8">Select a user from the sidebar to start chatting.</p>
             <div className="flex flex-wrap justify-center gap-2 opacity-30">
-               {['ENCRYPT', 'SYNC', 'NODE_SCAN', 'LINK_ID'].map(tag => (
+               {['PRIVATE', 'SECURE', 'FAST', 'REALTIME'].map(tag => (
                  <span key={tag} className="px-3 py-1 border border-white/20 rounded-full text-[9px] font-mono">{tag}</span>
                ))}
             </div>
