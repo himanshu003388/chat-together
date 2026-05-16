@@ -3,9 +3,7 @@ import { supabase } from '../lib/supabaseBrowser';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Paperclip, FileText, Image as ImageIcon, X, Download,
-  Smile, MessageCircle, Pin, PinOff, Trash2, Edit3, Check,
-  ChevronLeft, Users, Hash, MoreVertical, Heart, ThumbsUp,
-  ThumbsDown, Laugh, Angry, UserPlus, Search, CheckCheck
+  MessageCircle, Pin, Trash2, Edit3, Search, CheckCheck, Smile
 } from 'lucide-react';
 
 interface Profile {
@@ -59,7 +57,6 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showPinned, setShowPinned] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredMessages, setFilteredMessages] = useState<Message[] | null>(null);
@@ -154,7 +151,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
         (data as unknown as Message[]).map(async (msg) => {
           const { data: reactions } = await supabase
             .from('reactions').select('*').eq('message_id', msg.id);
-            
+
           let reply_message = undefined;
           if (msg.reply_to) {
             const { data: replyMsg } = await supabase
@@ -162,7 +159,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
               .eq('id', msg.reply_to).single();
             reply_message = replyMsg;
           }
-            
+
           return { ...msg, reactions: reactions || [], reply_message };
         })
       );
@@ -200,92 +197,53 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
     try {
       setUploading(true);
       const fileExt = file.name.split('.').pop();
-      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `${currentUser.id}/${fileName}`;
 
-      const { error } = await supabase.storage
-        .from('chat-attachments').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage
+        .from('messages')
+        .upload(filePath, file);
 
-      if (error) throw error;
+      if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('chat-attachments').getPublicUrl(filePath);
-      return { url: data.publicUrl, name: file.name, type: file.type };
-    } catch (err) {
-      console.error('Upload error:', err);
+      const { data: { publicUrl } } = supabase.storage
+        .from('messages')
+        .getPublicUrl(filePath);
+
+      return { url: publicUrl, type: file.type, name: file.name };
+    } catch (error) {
+      console.error('Upload error:', error);
       return null;
     } finally {
       setUploading(false);
     }
   };
 
-  const sendMessage = async () => {
-    const trimmed = newMessage.trim();
-    if (!trimmed && !selectedFile) return;
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() && !selectedFile) return;
 
     let fileData = null;
     if (selectedFile) {
       fileData = await uploadFile(selectedFile);
-      if (!fileData && !trimmed) return;
+      if (!fileData) return;
     }
 
-    await supabase.from('messages').insert({
+    const { error } = await supabase.from('messages').insert({
       sender_id: currentUser.id,
-      receiver_id: null,
-      content: trimmed || null,
+      content: newMessage.trim() || null,
+      reply_to: replyTo?.id || null,
       file_url: fileData?.url || null,
       file_name: fileData?.name || null,
       file_type: fileData?.type || null,
-      reply_to: replyTo?.id || null,
     });
 
-    setNewMessage('');
-    setSelectedFile(null);
-    setReplyTo(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingId) {
-      await updateMessage();
-    } else {
-      await sendMessage();
+    if (!error) {
+      setNewMessage('');
+      setReplyTo(null);
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  };
-
-  const updateMessage = async () => {
-    if (!editingId || !editContent.trim()) return;
-
-    await supabase.from('messages')
-      .update({ content: editContent.trim() })
-      .eq('id', editingId);
-
-    setEditingId(null);
-    setEditContent('');
-  };
-
-  const deleteMessage = async (id: string) => {
-    if (!confirm('EXECUTE DELETE COMMAND?')) return;
-    await supabase.from('messages').delete().eq('id', id);
-    await supabase.from('reactions').delete().eq('message_id', id);
-    await supabase.from('pinned_messages').delete().eq('message_id', id);
-  };
-
-  const toggleReaction = async (messageId: string, emoji: string) => {
-    const existing = messages.find(m => m.id === messageId)?.reactions
-      ?.find(r => r.emoji === emoji && r.user_id === currentUser.id);
-
-    if (existing) {
-      await supabase.from('reactions').delete().eq('id', existing.id);
-    } else {
-      await supabase.from('reactions').insert({
-        message_id: messageId,
-        user_id: currentUser.id,
-        emoji
-      });
-    }
-
-    fetchMessages();
   };
 
   const togglePin = async (messageId: string) => {
@@ -294,13 +252,45 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
     if (isPinned) {
       await supabase.from('pinned_messages').delete().eq('message_id', messageId);
     } else {
-      await supabase.from('pinned_messages').insert({
-        message_id: messageId,
-        pinned_by: currentUser.id
-      });
+      await supabase.from('pinned_messages').insert({ message_id: messageId });
     }
 
     fetchPinnedMessages();
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    await supabase.from('messages').delete().eq('id', messageId);
+  };
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    const existing = await supabase
+      .from('reactions')
+      .select('*')
+      .eq('message_id', messageId)
+      .eq('user_id', currentUser.id)
+      .eq('emoji', emoji)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from('reactions').delete().eq('id', existing.id);
+    } else {
+      await supabase.from('reactions').insert({
+        message_id: messageId,
+        user_id: currentUser.id,
+        emoji,
+      });
+    }
+
+    fetchMessages();
+    fetchPinnedMessages();
+  };
+
+  const updateMessage = async () => {
+    if (!editingId || !editContent.trim()) return;
+
+    await supabase.from('messages').update({ content: editContent.trim() }).eq('id', editingId);
+    setEditingId(null);
+    setEditContent('');
   };
 
   const startEdit = (msg: Message) => {
@@ -334,14 +324,14 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   const renderFileContent = (msg: Message, isMe: boolean) => {
     if (!msg.file_url) return null;
     const isImage = msg.file_type?.startsWith('image/');
-    
+
     if (isImage) {
       return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3">
           <img
             src={msg.file_url}
             alt=""
-            className="max-w-full elite-border cursor-pointer transition-all hover:scale-[1.02]"
+            className="max-w-72 rounded-xl border border-white/10 cursor-pointer transition-all hover:scale-[1.02]"
             onClick={() => window.open(msg.file_url!, '_blank')}
           />
         </motion.div>
@@ -349,10 +339,10 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
     }
 
     return (
-      <div className={`mt-4 flex items-center gap-4 p-4 elite-border ${isMe ? 'bg-white/10' : 'bg-elite-neutral-50'}`}>
-        <FileText className="w-6 h-6" />
-        <span className="text-[10px] font-black uppercase truncate flex-1 tracking-tighter">{msg.file_name}</span>
-        <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="p-2 elite-border hover:bg-elite-black hover:text-white transition-all">
+      <div className={`mt-3 flex items-center gap-3 p-3 rounded-lg ${isMe ? 'bg-white/10' : 'bg-white/5'}`}>
+        <FileText className="w-5 h-5 text-white/50" />
+        <span className="text-sm truncate flex-1">{msg.file_name}</span>
+        <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-white/10 transition-all">
           <Download className="w-4 h-4" />
         </a>
       </div>
@@ -365,61 +355,60 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   );
 
   return (
-    <div className="flex flex-col h-full bg-white elite-border overflow-hidden">
+    <div className="flex flex-col h-full bg-surface-primary overflow-hidden">
       {/* Header */}
-      <div className="p-8 border-b border-elite-black bg-white">
+      <div className="p-4 border-b border-white/5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="w-14 h-14 elite-border flex items-center justify-center bg-elite-black text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
-              <Hash className="w-7 h-7" />
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+              </svg>
             </div>
             <div>
-              <h2 className="font-black text-2xl uppercase tracking-tightest">General Node</h2>
-              <div className="flex items-center gap-3 mt-1">
-                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                <p className="text-[10px] font-mono font-bold text-elite-neutral-400 uppercase tracking-[0.2em]">
-                  {onlineUsers.length} ACTIVE SIGNALS
+              <h2 className="font-semibold text-lg">General</h2>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="w-2 h-2 bg-accent-emerald rounded-full animate-pulse"></span>
+                <p className="text-xs text-white/40 font-mono">
+                  {onlineUsers.length} online
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className={`p-3 elite-border transition-all ${showSearch ? 'bg-elite-black text-white' : 'hover:bg-elite-neutral-50'}`}
+              className={`p-2.5 rounded-lg transition-all ${showSearch ? 'bg-accent-cyan/20 text-accent-cyan' : 'hover:bg-white/10 text-white/60'}`}
               aria-label="Search"
             >
               <Search className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowPinned(!showPinned)}
-              className={`p-3 elite-border transition-all ${showPinned ? 'bg-elite-black text-white' : 'hover:bg-elite-neutral-50'}`}
+              className={`p-2.5 rounded-lg transition-all ${showPinned ? 'bg-accent-cyan/20 text-accent-cyan' : 'hover:bg-white/10 text-white/60'}`}
               aria-label="Pinned"
             >
               <Pin className="w-5 h-5" />
-            </button>
-            <button className="p-3 elite-border hover:bg-elite-neutral-50 transition-all" aria-label="Members">
-              <Users className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         <AnimatePresence>
           {showSearch && (
-            <motion.div 
+            <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="mt-8 pt-8 border-t border-elite-neutral-100">
+              <div className="mt-4 pt-4 border-t border-white/5">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => searchMessages(e.target.value)}
-                  placeholder="FILTER DATA TRANSMISSIONS..."
-                  className="w-full px-6 py-4 elite-border bg-elite-neutral-50 focus:bg-white transition-all outline-none font-black text-[10px] tracking-[0.3em] uppercase"
+                  placeholder="Search messages..."
+                  className="input-glass text-sm"
                 />
               </div>
             </motion.div>
@@ -430,31 +419,35 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
       {/* Pinned Messages Panel */}
       <AnimatePresence>
         {showPinned && (
-          <motion.div 
+          <motion.div
             initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-            className="border-b border-elite-black bg-elite-neutral-50 overflow-hidden"
+            className="border-b border-white/5 bg-surface-secondary overflow-hidden"
           >
-            <div className="p-8">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-black text-[10px] uppercase tracking-[0.4em] flex items-center gap-3">
-                  <Pin className="w-4 h-4 text-elite-black" /> SECURED SIGNALS
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <Pin className="w-4 h-4 text-accent-cyan" /> Pinned Messages
                 </h3>
-                <button onClick={() => setShowPinned(false)} className="p-2 elite-border hover:bg-elite-black hover:text-white transition-all">
+                <button onClick={() => setShowPinned(false)} className="p-1.5 rounded-lg hover:bg-white/10 transition-all">
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="space-y-4">
-                {pinnedMessagesList.map(msg => (
-                  <div key={msg.id} className="p-4 bg-white elite-border flex items-start gap-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.05)]">
-                    <div className="w-8 h-8 elite-border flex-shrink-0 flex items-center justify-center text-[10px] font-black bg-elite-black text-white">
-                      {msg.profiles?.username?.[0]?.toUpperCase()}
+              <div className="space-y-2">
+                {pinnedMessagesList.length === 0 ? (
+                  <p className="text-sm text-white/40">No pinned messages</p>
+                ) : (
+                  pinnedMessagesList.map(msg => (
+                    <div key={msg.id} className="p-3 glass rounded-lg flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center text-sm font-medium">
+                        {msg.profiles?.username?.[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-medium text-accent-cyan">{msg.profiles?.username}</span>
+                        <p className="text-sm text-white/60 truncate">{msg.content}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[8px] font-mono font-bold text-elite-black uppercase">{msg.profiles?.username}</span>
-                      <p className="text-xs font-medium text-elite-neutral-600 truncate">{msg.content}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </motion.div>
@@ -462,81 +455,81 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
       </AnimatePresence>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-10 space-y-10 bg-white selection:bg-elite-black selection:text-white" role="log" aria-live="polite">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" role="log" aria-live="polite">
         <AnimatePresence mode="popLayout">
           {displayMessages.map((msg, idx) => {
             const isMe = msg.sender_id === currentUser.id;
             const isPinned = pinnedMessages.some(p => p.message_id === msg.id);
 
             return (
-              <motion.div 
+              <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, x: isMe ? 20 : -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.5 }}
-                className={`group relative flex ${isMe ? 'justify-end' : 'justify-start'} ${isPinned ? 'z-10' : ''}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.3 }}
+                className={`group flex ${isMe ? 'justify-end' : 'justify-start'} ${isPinned ? 'z-10' : ''}`}
               >
-                <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[70%]`}>
+                <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
                   {/* Sender Info */}
                   {!isMe && (
-                    <div className="flex items-center gap-3 mb-3 ml-1">
-                      <div className="w-6 h-6 elite-border flex items-center justify-center bg-elite-black text-white text-[8px] font-black">
+                    <div className="flex items-center gap-2 mb-2 ml-1">
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-xs font-medium">
                         {msg.profiles?.username?.[0].toUpperCase()}
                       </div>
-                      <span className="text-[9px] font-black uppercase tracking-widest">{msg.profiles?.username}</span>
+                      <span className="text-xs font-medium text-white/70">{msg.profiles?.username}</span>
                     </div>
                   )}
 
                   {/* Reply Preview */}
                   {msg.reply_message && (
-                    <div className={`mb-2 p-3 elite-border text-[10px] font-medium opacity-60 border-b-0 ${isMe ? 'bg-elite-neutral-50' : 'bg-white'}`}>
-                      <span className="font-black uppercase tracking-tighter block mb-1">RE: {msg.reply_message.profiles?.username}</span>
-                      <p className="truncate italic">{msg.reply_message.content}</p>
+                    <div className={`mb-2 p-2 rounded-lg text-xs ${isMe ? 'bg-accent-cyan/10' : 'bg-white/5'}`}>
+                      <span className="font-medium block mb-1 text-accent-cyan">Replying to {msg.reply_message.profiles?.username}</span>
+                      <p className="truncate text-white/50">{msg.reply_message.content}</p>
                     </div>
                   )}
 
                   {/* Message Bubble */}
-                  <div className={`relative elite-border px-6 py-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all ${
-                    isMe ? 'bg-elite-black text-white' : 'bg-white text-elite-black'
-                  } ${isPinned ? 'ring-4 ring-elite-black ring-offset-2' : ''}`}>
-                    {isPinned && <Pin className="absolute -top-3 -right-3 w-6 h-6 bg-white elite-border p-1.5" />}
-                    
+                  <div className={`relative rounded-2xl px-4 py-3 transition-all ${
+                    isMe ? 'bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary' : 'bg-surface-elevated border border-white/10'
+                  } ${isPinned ? 'ring-2 ring-accent-cyan/50' : ''}`}>
+                    {isPinned && <Pin className="absolute -top-2 -right-2 w-4 h-4 text-accent-cyan" />}
+
                     {editingId === msg.id ? (
-                      <div className="flex flex-col gap-4 min-w-[200px]">
+                      <div className="flex flex-col gap-2 min-w-[200px]">
                         <input
                           ref={editInputRef}
                           type="text"
                           value={editContent}
                           onChange={(e) => setEditContent(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && updateMessage()}
-                          className={`bg-transparent border-b-2 border-white/20 focus:border-white outline-none py-1 text-sm font-bold uppercase ${isMe ? 'text-white' : 'text-elite-black border-elite-black/20 focus:border-elite-black'}`}
+                          className="bg-transparent border-b border-white/20 focus:border-white outline-none py-1 text-sm"
                         />
                         <div className="flex justify-end gap-2">
-                          <button onClick={updateMessage} className="text-[8px] font-black uppercase underline">COMMIT</button>
-                          <button onClick={cancelEdit} className="text-[8px] font-black uppercase underline opacity-50">ABORT</button>
+                          <button onClick={updateMessage} className="text-xs font-medium underline">Save</button>
+                          <button onClick={cancelEdit} className="text-xs text-white/50 underline">Cancel</button>
                         </div>
                       </div>
                     ) : (
                       <>
-                        {msg.content && <p className="text-sm font-bold leading-relaxed tracking-tight uppercase">{msg.content}</p>}
+                        {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
                         {renderFileContent(msg, isMe)}
                       </>
                     )}
                   </div>
 
                   {/* Meta & Actions */}
-                  <div className={`mt-4 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-all duration-200 ${isMe ? 'flex-row-reverse' : ''}`}>
-                    <span className="text-[8px] font-mono font-bold text-elite-neutral-400 uppercase">
+                  <div className={`mt-2 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200 ${isMe ? 'flex-row-reverse' : ''}`}>
+                    <span className="text-xs text-white/40 font-mono">
                       {formatTime(msg.created_at)}
                     </span>
-                    
+
                     <div className="flex items-center gap-1">
-                      <button onClick={() => setReplyTo(msg)} className="p-1.5 hover:bg-elite-black hover:text-white elite-border transition-all"><MessageCircle className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => togglePin(msg.id)} className={`p-1.5 elite-border transition-all ${isPinned ? 'bg-elite-black text-white' : 'hover:bg-elite-black hover:text-white'}`}><Pin className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setReplyTo(msg)} className="p-1.5 rounded-lg hover:bg-white/10 transition-all"><MessageCircle className="w-3.5 h-3.5 text-white/50" /></button>
+                      <button onClick={() => togglePin(msg.id)} className={`p-1.5 rounded-lg transition-all ${isPinned ? 'bg-accent-cyan/20 text-accent-cyan' : 'hover:bg-white/10 text-white/50'}`}><Pin className="w-3.5 h-3.5" /></button>
                       {isMe && (
                         <>
-                          <button onClick={() => startEdit(msg)} className="p-1.5 hover:bg-elite-black hover:text-white elite-border transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
-                          <button onClick={() => deleteMessage(msg.id)} className="p-1.5 hover:bg-red-500 hover:text-white elite-border border-red-500 text-red-500 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => startEdit(msg)} className="p-1.5 rounded-lg hover:bg-white/10 transition-all"><Edit3 className="w-3.5 h-3.5 text-white/50" /></button>
+                          <button onClick={() => deleteMessage(msg.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 transition-all"><Trash2 className="w-3.5 h-3.5 text-white/50 hover:text-red-400" /></button>
                         </>
                       )}
                     </div>
@@ -544,7 +537,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
 
                   {/* Reactions */}
                   {msg.reactions && msg.reactions.length > 0 && (
-                    <div className={`flex flex-wrap gap-2 mt-4 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`flex flex-wrap gap-1.5 mt-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
                       {Array.from(new Set(msg.reactions.map(r => r.emoji))).map(emoji => {
                         const count = msg.reactions!.filter(r => r.emoji === emoji).length;
                         const hasReacted = msg.reactions!.some(r => r.emoji === emoji && r.user_id === currentUser.id);
@@ -552,8 +545,8 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
                           <button
                             key={emoji}
                             onClick={() => toggleReaction(msg.id, emoji)}
-                            className={`px-3 py-1 elite-border text-[10px] font-black transition-all ${
-                              hasReacted ? 'bg-elite-black text-white' : 'bg-white text-elite-black hover:bg-elite-neutral-50'
+                            className={`px-2 py-1 rounded-full text-xs transition-all ${
+                              hasReacted ? 'bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30' : 'bg-white/5 text-white/60 hover:bg-white/10'
                             }`}
                           >
                             {emoji} {count}
@@ -573,24 +566,24 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
       {/* Input Contexts */}
       <AnimatePresence>
         {(replyTo || selectedFile) && (
-          <motion.div 
+          <motion.div
             initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
-            className="px-8 py-4 border-t border-elite-black bg-elite-neutral-50 flex items-center gap-6"
+            className="px-4 py-3 border-t border-white/5 bg-surface-secondary flex items-center gap-4"
           >
-            <div className="flex-1 min-w-0 flex items-center gap-4">
-              <div className="w-10 h-10 elite-border flex items-center justify-center bg-elite-black text-white">
-                {replyTo ? <MessageCircle className="w-5 h-5" /> : <Paperclip className="w-5 h-5" />}
+            <div className="flex-1 min-w-0 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center">
+                {replyTo ? <MessageCircle className="w-4 h-4" /> : <Paperclip className="w-4 h-4" />}
               </div>
               <div className="min-w-0">
-                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-elite-neutral-400">
-                  {replyTo ? `RESPONDING TO ${replyTo.profiles?.username}` : 'FILE ATTACHMENT READY'}
+                <p className="text-xs text-white/40">
+                  {replyTo ? `Replying to ${replyTo.profiles?.username}` : 'File attached'}
                 </p>
-                <p className="text-[10px] font-bold truncate uppercase">{replyTo ? replyTo.content : selectedFile?.name}</p>
+                <p className="text-sm font-medium truncate">{replyTo ? replyTo.content : selectedFile?.name}</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => { setReplyTo(null); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-              className="p-3 elite-border hover:bg-elite-black hover:text-white transition-all"
+              className="p-2 rounded-lg hover:bg-white/10 transition-all"
             >
               <X className="w-4 h-4" />
             </button>
@@ -599,29 +592,29 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
       </AnimatePresence>
 
       {/* Message Input */}
-      <div className="p-8 bg-white border-t border-elite-black">
-        <form onSubmit={handleSend} className="flex gap-6 items-end">
+      <div className="p-4 border-t border-white/5">
+        <form onSubmit={handleSend} className="flex gap-3 items-end">
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
 
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="elite-button !p-4 disabled:opacity-20"
+            className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all disabled:opacity-50"
             disabled={uploading}
             aria-label="Attach"
           >
-            <Paperclip className="w-6 h-6" />
+            <Paperclip className="w-5 h-5 text-white/60" />
           </button>
 
-          <div className="flex-1 relative group">
-            <label htmlFor="general-message-input" className="sr-only">Input Signal</label>
+          <div className="flex-1 relative">
+            <label htmlFor="general-message-input" className="sr-only">Message</label>
             <input
               id="general-message-input"
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="TYPE SIGNAL..."
-              className="w-full px-8 py-5 elite-border bg-elite-neutral-50 focus:bg-white focus:ring-12 focus:ring-elite-black/5 transition-all outline-none font-black text-xs uppercase tracking-tighter"
+              placeholder="Type a message..."
+              className="input-glass"
               disabled={uploading || !!editingId}
             />
           </div>
@@ -629,13 +622,13 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
           <button
             type="submit"
             disabled={(!newMessage.trim() && !selectedFile) || uploading || !!editingId}
-            aria-label="Execute"
-            className="elite-button bg-elite-black text-white !h-[60px] !w-20 shadow-[6px_6px_0px_0px_rgba(0,0,0,0.2)] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-1 hover:-translate-y-1"
+            aria-label="Send"
+            className="p-3 rounded-xl bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary font-medium hover:shadow-glow-cyan transition-all disabled:opacity-50"
           >
             {uploading ? (
-              <div className="w-6 h-1 bg-white animate-pulse mx-auto"></div>
+              <div className="w-5 h-5 border-2 border-surface-primary/30 border-t-surface-primary rounded-full animate-spin"></div>
             ) : (
-              <Send className="w-6 h-6 mx-auto" />
+              <Send className="w-5 h-5" />
             )}
           </button>
         </form>
