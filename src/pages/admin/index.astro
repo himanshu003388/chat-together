@@ -1,9 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { AdminService } from '../../services/admin.service';
-import { Users, Hash } from 'lucide-react';
+import { Users, Hash, MessageCircle, Shield, Trash2, AlertTriangle } from 'lucide-react';
 
-// Admin check is already handled by middleware, but we can verify again
 const profile = Astro.locals.profile;
 if (profile?.role !== 'admin') {
   return Astro.redirect('/');
@@ -12,88 +11,153 @@ if (profile?.role !== 'admin') {
 const adminService = new AdminService(Astro.locals.supabase);
 const { userCount, messageCount } = await adminService.getStats();
 const recentUsers = await adminService.getRecentUsers();
+const chatRooms = await adminService.getAllChatRooms();
+const recentMessages = await adminService.getAllMessages(10);
 ---
 
-<Layout title="Authority Command">
-  <div class="p-12">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-3 border-elite-black pb-12 mb-16">
+<Layout title="Admin Command Center">
+  <div class="min-h-screen bg-surface-primary p-4 sm:p-8">
+    {/* Header */}
+    <div class="flex items-center justify-between mb-10">
       <div>
-        <span class="text-[10px] font-black uppercase tracking-[0.3em] text-elite-neutral-400 mb-2 block">System Oversight</span>
-        <h1 class="text-6xl font-black text-elite-black tracking-tightest uppercase leading-none">Command Center</h1>
+        <div class="flex items-center gap-3 mb-2">
+          <Shield className="w-5 h-5 text-accent-cyan animate-pulse" />
+          <span class="text-[10px] font-bold text-accent-cyan uppercase tracking-[0.3em]">System Oversight</span>
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-black tracking-tighter uppercase italic">Command Center</h1>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-      <div class="elite-card bg-white flex items-center group">
-          <div class="w-16 h-16 elite-border flex items-center justify-center bg-elite-black text-white mr-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] group-hover:bg-white group-hover:text-elite-black transition-all">
-              <Users className="w-8 h-8" />
+    {/* Stats Grid */}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      <div class="glass-dark border border-white/10 p-6 rounded-2xl">
+        <div class="flex items-center gap-4 mb-3">
+          <div class="w-12 h-12 rounded-xl bg-accent-cyan/10 flex items-center justify-center">
+            <Users className="w-6 h-6 text-accent-cyan" />
           </div>
-          <div>
-              <p class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Total Nodes</p>
-              <p class="text-4xl font-black text-elite-black tracking-tighter leading-none">{userCount}</p>
-          </div>
+        </div>
+        <p class="text-3xl font-black tracking-tighter">{userCount}</p>
+        <p class="text-[10px] text-white/40 font-mono uppercase tracking-widest mt-1">Total Nodes</p>
       </div>
-      <div class="elite-card bg-white flex items-center group">
-          <div class="w-16 h-16 elite-border flex items-center justify-center bg-elite-black text-white mr-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] group-hover:bg-white group-hover:text-elite-black transition-all">
-              <Hash className="w-8 h-8" />
+
+      <div class="glass-dark border border-white/10 p-6 rounded-2xl">
+        <div class="flex items-center gap-4 mb-3">
+          <div class="w-12 h-12 rounded-xl bg-accent-purple/10 flex items-center justify-center">
+            <MessageCircle className="w-6 h-6 text-accent-purple" />
           </div>
-          <div>
-              <p class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Data Packets</p>
-              <p class="text-4xl font-black text-elite-black tracking-tighter leading-none">{messageCount}</p>
+        </div>
+        <p class="text-3xl font-black tracking-tighter">{messageCount}</p>
+        <p class="text-[10px] text-white/40 font-mono uppercase tracking-widest mt-1">Data Packets</p>
+      </div>
+
+      <div class="glass-dark border border-white/10 p-6 rounded-2xl">
+        <div class="flex items-center gap-4 mb-3">
+          <div class="w-12 h-12 rounded-xl bg-accent-pink/10 flex items-center justify-center">
+            <Hash className="w-6 h-6 text-accent-pink" />
           </div>
+        </div>
+        <p class="text-3xl font-black tracking-tighter">{chatRooms?.length || 0}</p>
+        <p class="text-[10px] text-white/40 font-mono uppercase tracking-widest mt-1">Active Channels</p>
+      </div>
+
+      <div class="glass-dark border border-white/10 p-6 rounded-2xl">
+        <div class="flex items-center gap-4 mb-3">
+          <div class="w-12 h-12 rounded-xl bg-accent-emerald/10 flex items-center justify-center">
+            <AlertTriangle className="w-6 h-6 text-accent-emerald" />
+          </div>
+        </div>
+        <p class="text-3xl font-black tracking-tighter">{recentUsers?.filter(u => u.is_banned).length || 0}</p>
+        <p class="text-[10px] text-white/40 font-mono uppercase tracking-widest mt-1">Terminated</p>
       </div>
     </div>
 
-    <div class="bg-white elite-border overflow-hidden shadow-[24px_24px_0px_0px_rgba(0,0,0,0.03)]">
-      <div class="p-8 border-b border-elite-black flex justify-between items-center bg-elite-neutral-50">
-          <h2 class="text-[10px] font-black uppercase tracking-[0.4em] text-elite-black">Recent Signal Activations</h2>
-          <a href="/admin/users" class="text-[10px] font-black uppercase underline hover:line-through">Access All Nodes</a>
+    {/* Quick Links */}
+    <div class="grid grid-cols-2 gap-4 mb-10">
+      <a href="/admin/users" class="glass-dark border border-white/10 p-6 rounded-2xl hover:border-accent-cyan/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center">
+              <Users className="w-6 h-6 text-surface-primary" />
+            </div>
+            <div>
+              <h3 class="font-bold uppercase italic tracking-tight">Node Registry</h3>
+              <p class="text-xs text-white/40">Manage all users</p>
+            </div>
+          </div>
+          <span class="text-accent-cyan opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+        </div>
+      </a>
+
+      <a href="/admin/messages" class="glass-dark border border-white/10 p-6 rounded-2xl hover:border-accent-purple/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center">
+              <MessageCircle className="w-6 h-6 text-surface-primary" />
+            </div>
+            <div>
+              <h3 class="font-bold uppercase italic tracking-tight">Message Logs</h3>
+              <p class="text-xs text-white/40">View all transmissions</p>
+            </div>
+          </div>
+          <span class="text-accent-purple opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+        </div>
+      </a>
+    </div>
+
+    {/* Recent Users & Messages */}
+    <div class="grid lg:grid-cols-2 gap-6">
+      {/* Recent Users */}
+      <div class="glass-dark border border-white/10 rounded-2xl overflow-hidden">
+        <div class="p-5 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+          <h3 class="font-bold uppercase italic tracking-tight flex items-center gap-2">
+            <Users className="w-4 h-4 text-accent-cyan" />
+            Recent Activations
+          </h3>
+          <a href="/admin/users" class="text-[10px] text-white/40 hover:text-accent-cyan uppercase tracking-widest">View All</a>
+        </div>
+        <div class="divide-y divide-white/5">
+          {recentUsers?.slice(0, 5).map((u) => (
+            <div class="p-4 flex items-center gap-4 hover:bg-white/[0.02] transition-colors">
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold text-surface-primary text-sm">
+                {u.username?.[0].toUpperCase()}
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-sm truncate">{u.username}</p>
+                <p class="text-[10px] text-white/40 font-mono">{u.email}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class={`px-2 py-0.5 rounded-full text-[8px] font-mono uppercase ${u.role === 'admin' ? 'bg-accent-cyan/20 text-accent-cyan' : 'bg-white/10 text-white/40'}`}>
+                  {u.role}
+                </span>
+                <span class={`w-2 h-2 rounded-full ${u.is_banned ? 'bg-accent-pink' : 'bg-accent-emerald'}`}></span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-elite-black">
-          <thead class="bg-white">
-            <tr>
-              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Node Identity</th>
-              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Auth Level</th>
-              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Activation</th>
-              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Status</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-elite-neutral-100">
-            {recentUsers?.map((u) => (
-              <tr class="hover:bg-elite-neutral-50 transition-colors">
-                <td class="px-8 py-6 whitespace-nowrap">
-                  <div class="flex items-center">
-                    <div class="flex-shrink-0 h-10 w-10 elite-border bg-elite-black text-white flex items-center justify-center font-black text-xs overflow-hidden">
-                      {u.avatar_url ? (
-                          <img class="h-full w-full object-cover" src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${u.avatar_url}`} alt="" />
-                      ) : (
-                          u.username.charAt(0).toUpperCase()
-                      )}
-                    </div>
-                    <div class="ml-4">
-                      <div class="text-[10px] font-black uppercase tracking-tightest">{u.username}</div>
-                      <div class="text-[8px] font-mono font-bold text-elite-neutral-400">{u.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td class="px-8 py-6 whitespace-nowrap">
-                  <span class={`elite-border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${u.role === 'admin' ? 'bg-elite-black text-white' : 'bg-white text-elite-black'}`}>
-                    {u.role}
-                  </span>
-                </td>
-                <td class="px-8 py-6 whitespace-nowrap text-[8px] font-mono font-bold uppercase text-elite-neutral-500">
-                  {new Date(u.created_at).toISOString().split('T')[0]}
-                </td>
-                <td class="px-8 py-6 whitespace-nowrap">
-                  <span class={`text-[8px] font-black uppercase tracking-[0.2em] ${u.is_banned ? 'text-red-600' : 'text-green-600'}`}>
-                    {u.is_banned ? 'TERMINATED' : 'PERSISTENT'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      {/* Recent Messages */}
+      <div class="glass-dark border border-white/10 rounded-2xl overflow-hidden">
+        <div class="p-5 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+          <h3 class="font-bold uppercase italic tracking-tight flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-accent-purple" />
+            Recent Transmissions
+          </h3>
+        </div>
+        <div class="divide-y divide-white/5 max-h-[350px] overflow-y-auto">
+          {recentMessages?.map((m) => (
+            <div class="p-4 hover:bg-white/[0.02] transition-colors">
+              <div class="flex items-center gap-3 mb-2">
+                <div class="w-6 h-6 rounded-lg bg-surface-elevated flex items-center justify-center text-[10px] font-bold text-accent-purple">
+                  {m.profiles?.username?.[0].toUpperCase()}
+                </div>
+                <span class="text-xs font-bold text-accent-cyan uppercase">{m.profiles?.username}</span>
+                <span class="text-[10px] text-white/30 font-mono">{new Date(m.created_at).toLocaleTimeString()}</span>
+              </div>
+              <p class="text-sm text-white/70 line-clamp-2">{m.content || '[File Attachment]'}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   </div>

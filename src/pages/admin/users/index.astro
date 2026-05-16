@@ -2,7 +2,7 @@
 import Layout from '../../../layouts/Layout.astro';
 import { AdminService } from '../../../services/admin.service';
 import { logger } from '../../../utils/logger';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Shield } from 'lucide-react';
 
 const user = Astro.locals.user;
 const supabase = Astro.locals.supabase;
@@ -12,10 +12,11 @@ if (profile?.role !== 'admin') {
   return Astro.redirect('/');
 }
 
-const adminService = new AdminService(supabase);
+const adminService = new AdminService(Astro.locals.supabase);
 let errorMessage = '';
+let successMessage = '';
 
-// Handle actions (Ban/Unban/Elevate)
+// Handle actions (Ban/Unban/Elevate/Demote/Delete)
 if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
@@ -25,12 +26,19 @@ if (Astro.request.method === 'POST') {
     if (targetUserId && action) {
       if (action === 'ban') {
         await adminService.toggleBan(targetUserId, true);
+        successMessage = 'User terminated successfully';
       } else if (action === 'unban') {
         await adminService.toggleBan(targetUserId, false);
+        successMessage = 'User reinstated successfully';
       } else if (action === 'make_admin') {
-        const { error } = await supabase.from('profiles').update({ role: 'admin' }).eq('id', targetUserId);
-        if (error) throw error;
-        logger.info({ targetUserId }, 'User elevated to admin');
+        await adminService.promoteToAdmin(targetUserId);
+        successMessage = 'User elevated to admin';
+      } else if (action === 'demote') {
+        await adminService.demoteToUser(targetUserId);
+        successMessage = 'User demoted to user role';
+      } else if (action === 'delete') {
+        await adminService.deleteUser(targetUserId);
+        successMessage = 'User permanently deleted';
       }
     }
   } catch (err: any) {
@@ -43,78 +51,104 @@ if (Astro.request.method === 'POST') {
 const allUsers = await adminService.getAllUsers();
 ---
 
-<Layout title="Node Management">
-  <div class="p-12">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-3 border-elite-black pb-12 mb-16">
-      <div>
-        <span class="text-[10px] font-black uppercase tracking-[0.3em] text-elite-neutral-400 mb-2 block">Network Supervision</span>
-        <h1 class="text-6xl font-black text-elite-black tracking-tightest uppercase leading-none">Node Registry</h1>
-      </div>
-      <a href="/admin" class="text-[10px] font-black uppercase underline hover:line-through flex items-center gap-3 group">
-          <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-          Protocol Dashboard
+<Layout title="Node Registry">
+  <div class="min-h-screen bg-surface-primary p-4 sm:p-8">
+    {/* Header */}
+    <div class="flex items-center gap-4 mb-10">
+      <a href="/admin" class="p-3 hover:bg-white/5 rounded-xl transition-colors">
+        <ChevronLeft className="w-6 h-6 text-white/40" />
       </a>
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <Shield className="w-5 h-5 text-accent-cyan animate-pulse" />
+          <span class="text-[10px] font-bold text-accent-cyan uppercase tracking-[0.3em]">Network Supervision</span>
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-black tracking-tighter uppercase italic">Node Registry</h1>
+      </div>
     </div>
 
     {errorMessage && (
-      <div class="bg-red-500 text-white p-4 elite-border shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] mb-8 font-mono text-[10px] font-black uppercase tracking-widest">
-        Error: {errorMessage}
+      <div class="glass-dark border-accent-pink/30 bg-accent-pink/10 p-4 rounded-2xl mb-6 flex items-center gap-3">
+        <span class="text-accent-pink text-sm font-bold uppercase">{errorMessage}</span>
       </div>
     )}
 
-    <div class="bg-white elite-border overflow-hidden shadow-[24px_24px_0px_0px_rgba(0,0,0,0.03)]">
+    {successMessage && (
+      <div class="glass-dark border-accent-emerald/30 bg-accent-emerald/10 p-4 rounded-2xl mb-6 flex items-center gap-3">
+        <span class="text-accent-emerald text-sm font-bold uppercase">{successMessage}</span>
+      </div>
+    )}
+
+    {/* Users Table */}
+    <div class="glass-dark border border-white/10 rounded-2xl overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-elite-black">
-          <thead class="bg-elite-neutral-50/50">
+        <table class="w-full">
+          <thead class="bg-white/[0.02] border-b border-white/5">
             <tr>
-              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Node Identity</th>
-              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Auth Level</th>
-              <th class="px-8 py-5 text-left text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Status</th>
-              <th class="px-8 py-5 text-right text-[8px] font-black text-elite-neutral-400 uppercase tracking-[0.4em]">Directives</th>
+              <th class="px-6 py-4 text-left text-[10px] font-bold text-white/40 uppercase tracking-widest">Node Identity</th>
+              <th class="px-6 py-4 text-left text-[10px] font-bold text-white/40 uppercase tracking-widest">Auth Level</th>
+              <th class="px-6 py-4 text-left text-[10px] font-bold text-white/40 uppercase tracking-widest">Status</th>
+              <th class="px-6 py-4 text-left text-[10px] font-bold text-white/40 uppercase tracking-widest">Last Active</th>
+              <th class="px-6 py-4 text-right text-[10px] font-bold text-white/40 uppercase tracking-widest">Directives</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-elite-neutral-100">
+          <tbody class="divide-y divide-white/5">
             {allUsers?.map((u) => (
-              <tr class="hover:bg-elite-neutral-50 transition-colors">
-                <td class="px-8 py-6 whitespace-nowrap">
-                  <div class="flex items-center">
-                    <div class="flex-shrink-0 h-10 w-10 elite-border bg-elite-black text-white flex items-center justify-center font-black text-xs overflow-hidden">
-                      {u.avatar_url ? (
-                          <img class="h-full w-full object-cover" src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${u.avatar_url}`} alt="" />
-                      ) : (
-                          u.username.charAt(0).toUpperCase()
-                      )}
+              <tr class="hover:bg-white/[0.02] transition-colors">
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold text-surface-primary text-sm">
+                      {u.username?.[0].toUpperCase()}
                     </div>
-                    <div class="ml-4">
-                      <div class="text-[10px] font-black uppercase tracking-tightest">{u.username}</div>
-                      <div class="text-[8px] font-mono font-bold text-elite-neutral-400">{u.email}</div>
+                    <div>
+                      <p class="font-bold text-sm">{u.username}</p>
+                      <p class="text-[10px] text-white/40 font-mono">{u.email}</p>
                     </div>
                   </div>
                 </td>
-                <td class="px-8 py-6 whitespace-nowrap">
-                  <span class={`elite-border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${u.role === 'admin' ? 'bg-elite-black text-white' : 'bg-white text-elite-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'}`}>
+                <td class="px-6 py-4">
+                  <span class={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${u.role === 'admin' ? 'bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30' : 'bg-white/5 text-white/40 border border-white/10'}`}>
                     {u.role}
                   </span>
                 </td>
-                <td class="px-8 py-6 whitespace-nowrap">
-                  <span class={`text-[8px] font-black uppercase tracking-[0.2em] ${u.is_banned ? 'text-red-600' : 'text-green-600'}`}>
-                    {u.is_banned ? 'TERMINATED' : 'PERSISTENT'}
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2">
+                    <span class={`w-2 h-2 rounded-full ${u.is_banned ? 'bg-accent-pink' : 'bg-accent-emerald'}`}></span>
+                    <span class={`text-[10px] font-bold uppercase tracking-widest ${u.is_banned ? 'text-accent-pink' : 'text-accent-emerald'}`}>
+                      {u.is_banned ? 'Terminated' : 'Active'}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-[10px] text-white/40 font-mono">
+                    {u.last_seen ? new Date(u.last_seen).toLocaleDateString() : 'Never'}
                   </span>
                 </td>
-                <td class="px-8 py-6 whitespace-nowrap text-right">
-                  <div class="flex justify-end gap-3">
-                    <form method="post" class="flex gap-3">
-                      <input type="hidden" name="userId" value={u.id} />
-                      {u.is_banned ? (
-                        <button type="submit" name="action" value="unban" class="text-[8px] font-black uppercase tracking-widest bg-green-500 text-white px-3 py-1.5 elite-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-green-600 transition-all">REINSTATE</button>
-                      ) : (
-                        <button type="submit" name="action" value="ban" class="text-[8px] font-black uppercase tracking-widest bg-red-500 text-white px-3 py-1.5 elite-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-600 transition-all" disabled={u.id === user?.id}>TERMINATE</button>
-                      )}
-                      {u.role !== 'admin' && (
-                        <button type="submit" name="action" value="make_admin" class="text-[8px] font-black uppercase tracking-widest bg-white text-elite-black px-3 py-1.5 elite-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-elite-black hover:text-white transition-all">ELEVATE</button>
-                      )}
-                    </form>
-                  </div>
+                <td class="px-6 py-4 text-right">
+                  <form method="post" class="flex justify-end gap-2">
+                    <input type="hidden" name="userId" value={u.id} />
+                    {u.is_banned ? (
+                      <button type="submit" name="action" value="unban" class="p-2 rounded-xl bg-accent-emerald/10 text-accent-emerald hover:bg-accent-emerald/20 transition-all text-[10px] font-bold uppercase">
+                        Reinstate
+                      </button>
+                    ) : (
+                      <button type="submit" name="action" value="ban" class="p-2 rounded-xl bg-accent-pink/10 text-accent-pink hover:bg-accent-pink/20 transition-all text-[10px] font-bold uppercase disabled:opacity-30" disabled={u.id === user?.id}>
+                        Terminate
+                      </button>
+                    )}
+                    {u.role === 'admin' ? (
+                      <button type="submit" name="action" value="demote" class="p-2 rounded-xl bg-white/5 text-white/40 hover:bg-white/10 transition-all text-[10px] font-bold uppercase" disabled={u.id === user?.id}>
+                        Demote
+                      </button>
+                    ) : (
+                      <button type="submit" name="action" value="make_admin" class="p-2 rounded-xl bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan/20 transition-all text-[10px] font-bold uppercase">
+                        Elevate
+                      </button>
+                    )}
+                    <button type="submit" name="action" value="delete" class="p-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-[10px] font-bold uppercase" disabled={u.id === user?.id} onclick="return confirm('Permanently delete this user?')">
+                      Delete
+                    </button>
+                  </form>
                 </td>
               </tr>
             ))}

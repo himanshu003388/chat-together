@@ -1,0 +1,125 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { AdminService } from '../../../services/admin.service';
+import { logger } from '../../../utils/logger';
+import { ChevronLeft, MessageCircle, Trash2 } from 'lucide-react';
+
+const profile = Astro.locals.profile;
+
+if (profile?.role !== 'admin') {
+  return Astro.redirect('/');
+}
+
+const adminService = new AdminService(Astro.locals.supabase);
+let successMessage = '';
+
+// Handle delete message
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const messageId = formData.get('messageId')?.toString();
+    const action = formData.get('action')?.toString();
+
+    if (messageId && action === 'delete') {
+      await adminService.deleteMessage(messageId);
+      successMessage = 'Message deleted successfully';
+    }
+  } catch (err: any) {
+    logger.error(err, 'Admin action failed');
+  }
+}
+
+const allMessages = await adminService.getAllMessages(100);
+---
+
+<Layout title="Message Logs">
+  <div class="min-h-screen bg-surface-primary p-4 sm:p-8">
+    {/* Header */}
+    <div class="flex items-center gap-4 mb-10">
+      <a href="/admin" class="p-3 hover:bg-white/5 rounded-xl transition-colors">
+        <ChevronLeft className="w-6 h-6 text-white/40" />
+      </a>
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <MessageCircle className="w-5 h-5 text-accent-purple animate-pulse" />
+          <span class="text-[10px] font-bold text-accent-purple uppercase tracking-[0.3em]">Data Oversight</span>
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-black tracking-tighter uppercase italic">Transmission Logs</h1>
+      </div>
+    </div>
+
+    {successMessage && (
+      <div class="glass-dark border-accent-emerald/30 bg-accent-emerald/10 p-4 rounded-2xl mb-6 flex items-center gap-3">
+        <span class="text-accent-emerald text-sm font-bold uppercase">{successMessage}</span>
+      </div>
+    )}
+
+    <div class="glass-dark border border-white/10 rounded-2xl overflow-hidden">
+      <div class="p-4 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+        <span class="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+          {allMessages?.length || 0} Total Transmissions
+        </span>
+      </div>
+
+      <div class="divide-y divide-white/5 max-h-[70vh] overflow-y-auto">
+        {allMessages?.map((m) => (
+          <div class="p-4 hover:bg-white/[0.02] transition-colors">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold text-surface-primary text-xs">
+                    {m.profiles?.username?.[0].toUpperCase()}
+                  </div>
+                  <span class="font-bold text-sm text-accent-cyan">{m.profiles?.username || 'Unknown'}</span>
+                  {m.chat_rooms && (
+                    <span class="text-[10px] text-white/40 bg-white/5 px-2 py-0.5 rounded-full">
+                      #{m.chat_rooms.name}
+                    </span>
+                  )}
+                  {!m.chat_id && !m.receiver_id && (
+                    <span class="text-[10px] text-accent-purple bg-accent-purple/10 px-2 py-0.5 rounded-full">
+                      General
+                    </span>
+                  )}
+                  {m.receiver_id && (
+                    <span class="text-[10px] text-accent-pink bg-accent-pink/10 px-2 py-0.5 rounded-full">
+                      Private
+                    </span>
+                  )}
+                  <span class="text-[10px] text-white/30 font-mono">
+                    {new Date(m.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <p class="text-sm text-white/70">{m.content || '[File Attachment]'}</p>
+                {m.file_url && (
+                  <div class="mt-2 text-[10px] text-white/40 font-mono">
+                    📎 {m.file_name || 'Attachment'}
+                  </div>
+                )}
+              </div>
+              <form method="post">
+                <input type="hidden" name="messageId" value={m.id} />
+                <button
+                  type="submit"
+                  name="action"
+                  value="delete"
+                  class="p-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
+                  onclick="return confirm('Delete this message?')"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          </div>
+        ))}
+
+        {(!allMessages || allMessages.length === 0) && (
+          <div class="p-12 text-center">
+            <MessageCircle className="w-12 h-12 text-white/20 mx-auto mb-4" />
+            <p class="text-white/40 text-sm">No transmissions found</p>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</Layout>
