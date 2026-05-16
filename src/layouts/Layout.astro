@@ -55,7 +55,6 @@ const isBanned = profile?.is_banned || false;
 									</a>
 									<a href="/chat" class="px-3 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Messages</a>
 									<a href="/chat/rooms" class="px-3 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Communities</a>
-									<a href="/profile" class="px-3 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all">Profile</a>
 									{isAdmin && (
 										<a href="/admin" class="px-3 py-2 text-sm font-medium text-accent-cyan hover:text-accent-cyan/80 bg-accent-cyan/10 rounded-lg transition-all">Admin</a>
 									)}
@@ -65,12 +64,9 @@ const isBanned = profile?.is_banned || false;
 						<div class="flex items-center gap-3">
 							{user ? (
 								<>
-									<a href="/profile" class="w-9 h-9 rounded-full bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center text-sm font-medium hover:shadow-glow-cyan transition-all" title="Profile">
+									<a href="/profile" class="w-9 h-9 rounded-full bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center text-sm font-medium hover:shadow-glow-cyan transition-all border border-white/10" title="Profile">
 										{profile?.username?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}
 									</a>
-									<form action="/api/auth/signout" method="post">
-										<button type="submit" class="btn-ghost text-sm">Sign Out</button>
-									</form>
 								</>
 							) : (
 								<div class="flex items-center gap-3">

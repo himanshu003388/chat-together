@@ -1,33 +1,17 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import { AdminService } from '../../services/admin.service';
+import { Users, Hash } from 'lucide-react';
 
-// Extra check just in case, though middleware handles this
-const user = Astro.locals.user;
-const { data: profile } = await Astro.locals.supabase
-  .from('profiles')
-  .select('role')
-  .eq('id', user?.id)
-  .maybeSingle();
-
+// Admin check is already handled by middleware, but we can verify again
+const profile = Astro.locals.profile;
 if (profile?.role !== 'admin') {
   return Astro.redirect('/');
 }
 
-// Fetch stats
-const { count: userCount } = await Astro.locals.supabase
-  .from('profiles')
-  .select('*', { count: 'exact', head: true });
-
-const { count: messageCount } = await Astro.locals.supabase
-  .from('messages')
-  .select('*', { count: 'exact', head: true });
-
-const { data: recentUsers } = await Astro.locals.supabase
-  .from('profiles')
-  .select('*')
-  .order('created_at', { ascending: false })
-  .limit(5);
-
+const adminService = new AdminService(Astro.locals.supabase);
+const { userCount, messageCount } = await adminService.getStats();
+const recentUsers = await adminService.getRecentUsers();
 ---
 
 <Layout title="Authority Command">
@@ -42,7 +26,7 @@ const { data: recentUsers } = await Astro.locals.supabase
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
       <div class="elite-card bg-white flex items-center group">
           <div class="w-16 h-16 elite-border flex items-center justify-center bg-elite-black text-white mr-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] group-hover:bg-white group-hover:text-elite-black transition-all">
-              <Users class="w-8 h-8" />
+              <Users className="w-8 h-8" />
           </div>
           <div>
               <p class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Total Nodes</p>
@@ -51,7 +35,7 @@ const { data: recentUsers } = await Astro.locals.supabase
       </div>
       <div class="elite-card bg-white flex items-center group">
           <div class="w-16 h-16 elite-border flex items-center justify-center bg-elite-black text-white mr-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] group-hover:bg-white group-hover:text-elite-black transition-all">
-              <Hash class="w-8 h-8" />
+              <Hash className="w-8 h-8" />
           </div>
           <div>
               <p class="text-[10px] font-black uppercase tracking-widest text-elite-neutral-400">Data Packets</p>
@@ -80,9 +64,9 @@ const { data: recentUsers } = await Astro.locals.supabase
               <tr class="hover:bg-elite-neutral-50 transition-colors">
                 <td class="px-8 py-6 whitespace-nowrap">
                   <div class="flex items-center">
-                    <div class="flex-shrink-0 h-10 w-10 elite-border bg-elite-black text-white flex items-center justify-center font-black text-xs">
+                    <div class="flex-shrink-0 h-10 w-10 elite-border bg-elite-black text-white flex items-center justify-center font-black text-xs overflow-hidden">
                       {u.avatar_url ? (
-                          <img class="h-full w-full object-cover" src={u.avatar_url} alt="" />
+                          <img class="h-full w-full object-cover" src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${u.avatar_url}`} alt="" />
                       ) : (
                           u.username.charAt(0).toUpperCase()
                       )}

@@ -1,6 +1,8 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import RoomChat from '../../../components/RoomChat';
+import { ChatService } from '../../../services/chat.service';
+import { logger } from '../../../utils/logger';
 
 const { id } = Astro.params;
 const user = Astro.locals.user;
@@ -11,35 +13,13 @@ if (!user) {
   return Astro.redirect('/login');
 }
 
-// Fetch room details
-const { data: room, error } = await supabase
-  .from('chat_rooms')
-  .select('*')
-  .eq('id', id)
-  .single();
-
-if (error || !room) {
-  return Astro.redirect('/chat/rooms');
-}
-
-// Ensure user is a member
-const { data: membership } = await supabase
-  .from('chat_room_members')
-  .select('*')
-  .eq('room_id', id)
-  .eq('user_id', user.id)
-  .maybeSingle();
-
-if (!membership) {
-  // Auto-join for public rooms
-  if (!room.is_private) {
-    await supabase.from('chat_room_members').insert({
-      room_id: id,
-      user_id: user.id
-    });
-  } else {
-    return Astro.redirect('/chat/rooms?error=Private room');
-  }
+let room;
+try {
+  const chatService = new ChatService(supabase);
+  room = await chatService.getRoomById(id!, user.id);
+} catch (err: any) {
+  logger.warn({ roomId: id, userId: user.id, error: err.message }, 'Failed to access room');
+  return Astro.redirect('/chat/rooms?error=' + encodeURIComponent(err.message));
 }
 ---
 

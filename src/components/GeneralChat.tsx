@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabaseBrowser';
+import { ChatService } from '../services/chat.service';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Send, Paperclip, FileText, Image as ImageIcon, X, Download,
-  MessageCircle, Pin, Trash2, Edit3, Search, CheckCheck, Smile
+  Send, Paperclip, FileText, X, Download,
+  MessageCircle, Pin, Trash2, Edit3, Search, Smile
 } from 'lucide-react';
 
 interface Profile {
@@ -36,10 +37,6 @@ interface Reaction {
   count?: number;
 }
 
-interface PinnedMessage {
-  message_id: string;
-}
-
 interface GeneralChatProps {
   currentUser: { id: string; email: string; username?: string };
 }
@@ -48,7 +45,7 @@ const EMOJI_OPTIONS = ['❤️', '👍', '👎', '😂', '😡', '🎉', '🔥',
 
 export default function GeneralChat({ currentUser }: GeneralChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [pinnedMessages, setPinnedMessages] = useState<PinnedMessage[]>([]);
+  const [pinnedMessages, setPinnedMessages] = useState<string[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
@@ -57,270 +54,196 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showPinned, setShowPinned] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [onlineUsersCount, setOnlineUsersCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredMessages, setFilteredMessages] = useState<Message[] | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  
+  const chatService = useMemo(() => new ChatService(supabase), []);
 
   useEffect(() => {
     fetchMessages();
     fetchPinnedMessages();
-    fetchOnlineUsers();
+    updateOnlineStatus();
 
     const channel = supabase
-      .channel('general-chat-updates')
+      .channel('general-chat-realtime')
       .on('postgres_changes', {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'messages',
         filter: 'receiver_id=is.null'
-      }, async (payload) => {
-        const newMsg = payload.new as Message;
-        if (newMsg.receiver_id !== null) return;
-        await attachProfileAndReactions(newMsg);
+      }, () => {
+        fetchMessages(); // Simple refresh for consistency, can be optimized later
       })
       .on('postgres_changes', {
-        event: 'UPDATE',
+        event: '*',
         schema: 'public',
-        table: 'messages'
-      }, (payload) => {
-        const updated = payload.new as Message;
-        setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m));
+        table: 'reactions'
+      }, () => {
+        fetchMessages();
       })
       .on('postgres_changes', {
-        event: 'DELETE',
+        event: '*',
         schema: 'public',
-        table: 'messages'
-      }, (payload) => {
-        const deleted = payload.old as { id: string };
-        setMessages(prev => prev.filter(m => m.id !== deleted.id));
+        table: 'pinned_messages'
+      }, () => {
+        fetchPinnedMessages();
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    const presenceInterval = setInterval(updateOnlineStatus, 30000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(presenceInterval);
+    };
   }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, filteredMessages]);
 
-  useEffect(() => {
-    if (editingId && editInputRef.current) {
-      editInputRef.current.focus();
-    }
-  }, [editingId]);
-
-  const attachProfileAndReactions = async (msg: Message) => {
-    const { data: profile } = await supabase
-      .from('profiles').select('id, username, avatar_url')
-      .eq('id', msg.sender_id).single();
-
-    const { data: reactions } = await supabase
-      .from('reactions').select('*')
-      .eq('message_id', msg.id);
-
-    if (msg.reply_to) {
-      const { data: replyMsg } = await supabase
-        .from('messages').select('*, profiles:sender_id(id, username, avatar_url)')
-        .eq('id', msg.reply_to).single();
-      msg.reply_message = replyMsg as unknown as Message;
-    }
-
-    msg.profiles = profile || undefined;
-    msg.reactions = reactions || [];
-
-    setMessages(prev => {
-      if (prev.some(m => m.id === msg.id)) return prev;
-      return [...prev, msg];
-    });
+  const updateOnlineStatus = async () => {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { count } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .gte('last_seen', fiveMinutesAgo);
+    setOnlineUsersCount(count || 0);
   };
 
   const fetchMessages = async () => {
-    const { data } = await supabase
-      .from('messages')
-      .select('*, profiles:sender_id(id, username, avatar_url)')
-      .is('receiver_id', null)
-      .order('created_at', { ascending: true })
-      .limit(100);
+    try {
+      const { data } = await supabase
+        .from('messages')
+        .select('*, profiles:sender_id(id, username, avatar_url), reactions(*)')
+        .is('receiver_id', null)
+        .order('created_at', { ascending: true })
+        .limit(100);
 
-    if (data) {
-      const messagesWithReactions = await Promise.all(
-        (data as unknown as Message[]).map(async (msg) => {
-          const { data: reactions } = await supabase
-            .from('reactions').select('*').eq('message_id', msg.id);
-
-          let reply_message = undefined;
-          if (msg.reply_to) {
-            const { data: replyMsg } = await supabase
-              .from('messages').select('*, profiles:sender_id(id, username, avatar_url)')
-              .eq('id', msg.reply_to).single();
-            reply_message = replyMsg;
-          }
-
-          return { ...msg, reactions: reactions || [], reply_message };
-        })
-      );
-      setMessages(messagesWithReactions);
+      if (data) {
+        const messagesWithReplies = await Promise.all(
+          (data as any[]).map(async (msg) => {
+            if (msg.reply_to) {
+              const parent = data.find((m: any) => m.id === msg.reply_to);
+              if (parent) {
+                msg.reply_message = parent;
+              } else {
+                const { data: dbParent } = await supabase
+                  .from('messages')
+                  .select('*, profiles:sender_id(username)')
+                  .eq('id', msg.reply_to)
+                  .single();
+                msg.reply_message = dbParent;
+              }
+            }
+            return msg;
+          })
+        );
+        setMessages(messagesWithReplies);
+      }
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
     }
   };
 
   const fetchPinnedMessages = async () => {
-    const { data } = await supabase
-      .from('pinned_messages')
-      .select('message_id');
-
-    if (data) setPinnedMessages(data);
-  };
-
-  const fetchOnlineUsers = async () => {
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data } = await supabase
-      .from('profiles')
-      .select('id')
-      .gte('last_seen', fiveMinutesAgo);
-
-    if (data) setOnlineUsers(data.map(p => p.id));
+    const { data } = await supabase.from('pinned_messages').select('message_id');
+    if (data) setPinnedMessages(data.map(p => p.message_id));
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) setSelectedFile(e.target.files[0]);
-  };
-
-  const uploadFile = async (file: File) => {
-    try {
-      setUploading(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${currentUser.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('chat-attachments')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat-attachments')
-        .getPublicUrl(filePath);
-
-      return { url: publicUrl, type: file.type, name: file.name };
-    } catch (error) {
-      console.error('Upload error:', error);
-      return null;
-    } finally {
-      setUploading(false);
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() && !selectedFile) return;
 
-    let fileData = null;
-    if (selectedFile) {
-      fileData = await uploadFile(selectedFile);
-      if (!fileData) return;
-    }
-
+    setUploading(true);
     try {
-      const { data, error } = await supabase.from('messages').insert({
-        sender_id: currentUser.id,
-        content: newMessage.trim() || null,
-        reply_to: replyTo?.id || null,
-        file_url: fileData?.url || null,
-      }).select();
-
-      if (error) {
-        console.error('Message insert error:', error);
-        alert('Failed to send message: ' + error.message);
-        return;
+      let fileInfo = null;
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `general/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('chat-attachments')
+          .upload(fileName, selectedFile);
+        
+        if (uploadError) throw uploadError;
+        fileInfo = { url: fileName, name: selectedFile.name, type: selectedFile.type };
       }
 
-      // Manually add the new message to state
-      if (data && data[0]) {
-        const newMsg = data[0] as Message;
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url')
-          .eq('id', currentUser.id)
-          .single();
-        newMsg.profiles = profile;
-        newMsg.reactions = [];
-        setMessages(prev => [...prev, newMsg]);
-      }
+      await chatService.sendMessage(
+        currentUser.id,
+        newMessage.trim() || null,
+        null, // No chat_id for general
+        null, // No receiver_id for general
+        replyTo?.id || null,
+        fileInfo
+      );
 
       setNewMessage('');
       setReplyTo(null);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (err) {
-      console.error('Send message error:', err);
-      alert('Failed to send message');
+    } catch (err: any) {
+      alert('Failed to send message: ' + err.message);
+    } finally {
+      setUploading(false);
     }
   };
 
   const togglePin = async (messageId: string) => {
-    const isPinned = pinnedMessages.some(p => p.message_id === messageId);
-
-    if (isPinned) {
-      await supabase.from('pinned_messages').delete().eq('message_id', messageId);
-    } else {
-      await supabase.from('pinned_messages').insert({ message_id: messageId });
+    try {
+      if (pinnedMessages.includes(messageId)) {
+        await chatService.unpinMessage(messageId);
+      } else {
+        await chatService.pinMessage(messageId, currentUser.id);
+      }
+    } catch (err) {
+      console.error('Pin error:', err);
     }
-
-    fetchPinnedMessages();
-  };
-
-  const deleteMessage = async (messageId: string) => {
-    await supabase.from('messages').delete().eq('id', messageId);
   };
 
   const toggleReaction = async (messageId: string, emoji: string) => {
-    const existing = await supabase
-      .from('reactions')
-      .select('*')
-      .eq('message_id', messageId)
-      .eq('user_id', currentUser.id)
-      .eq('emoji', emoji)
-      .maybeSingle();
-
-    if (existing) {
-      await supabase.from('reactions').delete().eq('id', existing.id);
-    } else {
-      await supabase.from('reactions').insert({
-        message_id: messageId,
-        user_id: currentUser.id,
-        emoji,
-      });
+    try {
+      const msg = messages.find(m => m.id === messageId);
+      const existing = msg?.reactions?.find(r => r.user_id === currentUser.id && r.emoji === emoji);
+      
+      if (existing) {
+        await chatService.removeReaction(messageId, currentUser.id, emoji);
+      } else {
+        await chatService.addReaction(messageId, currentUser.id, emoji);
+      }
+      setShowEmojiPicker(null);
+    } catch (err) {
+      console.error('Reaction error:', err);
     }
-
-    fetchMessages();
-    fetchPinnedMessages();
   };
 
-  const updateMessage = async () => {
+  const deleteMessage = async (messageId: string) => {
+    try {
+      await chatService.deleteMessage(messageId, currentUser.id);
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
+  };
+
+  const handleUpdate = async () => {
     if (!editingId || !editContent.trim()) return;
-
-    await supabase.from('messages').update({ content: editContent.trim() }).eq('id', editingId);
-    setEditingId(null);
-    setEditContent('');
-  };
-
-  const startEdit = (msg: Message) => {
-    setEditingId(msg.id);
-    setEditContent(msg.content || '');
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditContent('');
+    try {
+      await chatService.updateMessage(editingId, currentUser.id, editContent.trim());
+      setEditingId(null);
+      setEditContent('');
+    } catch (err) {
+      console.error('Update error:', err);
+    }
   };
 
   const searchMessages = (query: string) => {
@@ -329,250 +252,160 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
       setFilteredMessages(null);
       return;
     }
-    const filtered = messages.filter(m =>
+    const filtered = messages.filter(m => 
       m.content?.toLowerCase().includes(query.toLowerCase()) ||
       m.profiles?.username?.toLowerCase().includes(query.toLowerCase())
     );
     setFilteredMessages(filtered);
   };
 
-  const formatTime = (date: string) => {
-    const d = new Date(date);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-  };
-
-  const renderFileContent = (msg: Message, isMe: boolean) => {
-    if (!msg.file_url) return null;
-    const isImage = msg.file_type?.startsWith('image/');
-
-    if (isImage) {
-      return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3">
-          <img
-            src={msg.file_url}
-            alt=""
-            className="max-w-72 rounded-xl border border-white/10 cursor-pointer transition-all hover:scale-[1.02]"
-            onClick={() => window.open(msg.file_url!, '_blank')}
-          />
-        </motion.div>
-      );
-    }
-
-    return (
-      <div className={`mt-3 flex items-center gap-3 p-3 rounded-lg ${isMe ? 'bg-white/10' : 'bg-white/5'}`}>
-        <FileText className="w-5 h-5 text-white/50" />
-        <span className="text-sm truncate flex-1">{msg.file_name}</span>
-        <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-white/10 transition-all">
-          <Download className="w-4 h-4" />
-        </a>
-      </div>
-    );
+  const getFileUrl = (path: string) => {
+    return `${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/chat-attachments/${path}`;
   };
 
   const displayMessages = filteredMessages || messages;
-  const pinnedMessagesList = messages.filter(m =>
-    pinnedMessages.some(p => p.message_id === m.id)
-  );
+  const pinnedList = messages.filter(m => pinnedMessages.includes(m.id));
 
   return (
-    <div className="flex flex-col h-full bg-surface-primary overflow-hidden">
+    <div className="flex flex-col h-full bg-surface-primary overflow-hidden relative">
       {/* Header */}
-      <div className="p-4 border-b border-white/5">
+      <div className="p-4 border-b border-white/5 glass">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-              </svg>
+              <MessageCircle className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="font-semibold text-lg">General</h2>
+              <h2 className="font-semibold text-lg">General Hall</h2>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="w-2 h-2 bg-accent-emerald rounded-full animate-pulse"></span>
-                <p className="text-xs text-white/40 font-mono">
-                  {onlineUsers.length} online
-                </p>
+                <p className="text-xs text-white/40 font-mono">{onlineUsersCount} members online</p>
               </div>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSearch(!showSearch)}
-              className={`p-2.5 rounded-lg transition-all ${showSearch ? 'bg-accent-cyan/20 text-accent-cyan' : 'hover:bg-white/10 text-white/60'}`}
-              aria-label="Search"
-            >
+            <button onClick={() => setShowSearch(!showSearch)} className={`p-2.5 rounded-lg transition-all ${showSearch ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-white/40 hover:text-white'}`}>
               <Search className="w-5 h-5" />
             </button>
-            <button
-              onClick={() => setShowPinned(!showPinned)}
-              className={`p-2.5 rounded-lg transition-all ${showPinned ? 'bg-accent-cyan/20 text-accent-cyan' : 'hover:bg-white/10 text-white/60'}`}
-              aria-label="Pinned"
-            >
+            <button onClick={() => setShowPinned(!showPinned)} className={`p-2.5 rounded-lg transition-all ${showPinned ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-white/40 hover:text-white'}`}>
               <Pin className="w-5 h-5" />
             </button>
           </div>
         </div>
-
-        <AnimatePresence>
-          {showSearch && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="mt-4 pt-4 border-t border-white/5">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => searchMessages(e.target.value)}
-                  placeholder="Search messages..."
-                  className="input-glass text-sm"
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
-      {/* Pinned Messages Panel */}
       <AnimatePresence>
-        {showPinned && (
-          <motion.div
-            initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-            className="border-b border-white/5 bg-surface-secondary overflow-hidden"
-          >
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium flex items-center gap-2">
-                  <Pin className="w-4 h-4 text-accent-cyan" /> Pinned Messages
-                </h3>
-                <button onClick={() => setShowPinned(false)} className="p-1.5 rounded-lg hover:bg-white/10 transition-all">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="space-y-2">
-                {pinnedMessagesList.length === 0 ? (
-                  <p className="text-sm text-white/40">No pinned messages</p>
-                ) : (
-                  pinnedMessagesList.map(msg => (
-                    <div key={msg.id} className="p-3 glass rounded-lg flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center text-sm font-medium">
-                        {msg.profiles?.username?.[0]?.toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs font-medium text-accent-cyan">{msg.profiles?.username}</span>
-                        <p className="text-sm text-white/60 truncate">{msg.content}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+        {showSearch && (
+          <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="px-4 py-3 border-b border-white/5 bg-white/5">
+            <input 
+              type="text" 
+              value={searchQuery} 
+              onChange={(e) => searchMessages(e.target.value)} 
+              placeholder="Filter conversations..." 
+              className="input-glass !py-2 text-sm" 
+            />
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" role="log" aria-live="polite">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
         <AnimatePresence mode="popLayout">
-          {displayMessages.map((msg, idx) => {
+          {displayMessages.map((msg) => {
             const isMe = msg.sender_id === currentUser.id;
-            const isPinned = pinnedMessages.some(p => p.message_id === msg.id);
+            const isPinned = pinnedMessages.includes(msg.id);
+            const reactions = Array.from(new Set(msg.reactions?.map(r => r.emoji) || [])).map(emoji => ({
+              emoji,
+              count: msg.reactions?.filter(r => r.emoji === emoji).length || 0,
+              me: msg.reactions?.some(r => r.emoji === emoji && r.user_id === currentUser.id)
+            }));
 
             return (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.3 }}
-                className={`group flex ${isMe ? 'justify-end' : 'justify-start'} ${isPinned ? 'z-10' : ''}`}
-              >
-                <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
-                  {/* Sender Info */}
+              <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group/msg`}>
+                <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[70%]`}>
+                  
+                  {msg.reply_message && (
+                    <div className="flex items-center gap-2 mb-1 opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
+                      <div className="text-[10px] font-medium text-white/60 bg-white/5 px-2 py-0.5 rounded-full truncate max-w-[200px]">
+                        <span className="text-accent-cyan mr-1">@{msg.reply_message.profiles?.username}</span>
+                        {msg.reply_message.content}
+                      </div>
+                    </div>
+                  )}
+
                   {!isMe && (
                     <div className="flex items-center gap-2 mb-2 ml-1">
-                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-xs font-medium">
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center text-[10px] font-bold">
                         {msg.profiles?.username?.[0].toUpperCase()}
                       </div>
-                      <span className="text-xs font-medium text-white/70">{msg.profiles?.username}</span>
+                      <span className="text-xs font-bold text-white/70">{msg.profiles?.username}</span>
                     </div>
                   )}
 
-                  {/* Reply Preview */}
-                  {msg.reply_message && (
-                    <div className={`mb-2 p-2 rounded-lg text-xs ${isMe ? 'bg-accent-cyan/10' : 'bg-white/5'}`}>
-                      <span className="font-medium block mb-1 text-accent-cyan">Replying to {msg.reply_message.profiles?.username}</span>
-                      <p className="truncate text-white/50">{msg.reply_message.content}</p>
-                    </div>
-                  )}
-
-                  {/* Message Bubble */}
-                  <div className={`relative rounded-2xl px-4 py-3 transition-all ${
-                    isMe ? 'bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary' : 'bg-surface-elevated border border-white/10'
-                  } ${isPinned ? 'ring-2 ring-accent-cyan/50' : ''}`}>
-                    {isPinned && <Pin className="absolute -top-2 -right-2 w-4 h-4 text-accent-cyan" />}
-
-                    {editingId === msg.id ? (
-                      <div className="flex flex-col gap-2 min-w-[200px]">
-                        <input
-                          ref={editInputRef}
-                          type="text"
-                          value={editContent}
-                          onChange={(e) => setEditContent(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && updateMessage()}
-                          className="bg-transparent border-b border-white/20 focus:border-white outline-none py-1 text-sm"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button onClick={updateMessage} className="text-xs font-medium underline">Save</button>
-                          <button onClick={cancelEdit} className="text-xs text-white/50 underline">Cancel</button>
+                  <div className="relative group/bubble">
+                    <div className={`rounded-2xl px-4 py-3 transition-all relative ${isMe ? 'bg-gradient-to-br from-accent-cyan to-accent-blue text-surface-primary shadow-lg shadow-accent-cyan/10' : 'bg-surface-elevated border border-white/5'}`}>
+                      {isPinned && <Pin className="absolute -top-2 -right-2 w-4 h-4 text-accent-cyan fill-accent-cyan" />}
+                      
+                      {msg.file_url && (
+                        <div className="mb-2 overflow-hidden rounded-xl bg-black/10">
+                          {msg.file_type?.startsWith('image/') ? (
+                            <img src={getFileUrl(msg.file_url)} alt="" className="max-w-full h-auto max-h-[300px] object-contain cursor-pointer" onClick={() => window.open(getFileUrl(msg.file_url!), '_blank')} />
+                          ) : (
+                            <div className="p-3 flex items-center gap-3">
+                              <FileText className="w-5 h-5" />
+                              <div className="flex-1 overflow-hidden">
+                                <p className="text-xs font-bold truncate">{msg.file_name}</p>
+                                <p className="text-[10px] opacity-50 uppercase">{msg.file_type?.split('/')[1]}</p>
+                              </div>
+                              <a href={getFileUrl(msg.file_url)} download className="p-2 hover:bg-white/10 rounded-lg"><Download className="w-4 h-4" /></a>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ) : (
-                      <>
-                        {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
-                        {renderFileContent(msg, isMe)}
-                      </>
-                    )}
-                  </div>
+                      )}
+                      
+                      {editingId === msg.id ? (
+                        <div className="flex flex-col gap-2 min-w-[200px]">
+                          <input ref={editInputRef} type="text" value={editContent} onChange={(e) => setEditContent(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleUpdate()} className="bg-transparent border-b border-white/20 outline-none py-1 text-sm" />
+                          <div className="flex justify-end gap-2">
+                            <button onClick={handleUpdate} className="text-[10px] font-bold uppercase tracking-widest underline">Save</button>
+                            <button onClick={() => setEditingId(null)} className="text-[10px] font-bold uppercase tracking-widest opacity-50 underline">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                      )}
+                    </div>
 
-                  {/* Meta & Actions */}
-                  <div className={`mt-2 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200 ${isMe ? 'flex-row-reverse' : ''}`}>
-                    <span className="text-xs text-white/40 font-mono">
-                      {formatTime(msg.created_at)}
-                    </span>
-
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => setReplyTo(msg)} className="p-1.5 rounded-lg hover:bg-white/10 transition-all"><MessageCircle className="w-3.5 h-3.5 text-white/50" /></button>
-                      <button onClick={() => togglePin(msg.id)} className={`p-1.5 rounded-lg transition-all ${isPinned ? 'bg-accent-cyan/20 text-accent-cyan' : 'hover:bg-white/10 text-white/50'}`}><Pin className="w-3.5 h-3.5" /></button>
+                    {/* Action Tools */}
+                    <div className={`absolute top-0 ${isMe ? '-left-[140px]' : '-right-[140px]'} opacity-0 group-hover/bubble:opacity-100 transition-all flex items-center gap-1 bg-surface-secondary/90 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-2xl z-20`}>
+                      <button onClick={() => setReplyTo(msg)} className="p-2 hover:bg-white/10 rounded-xl text-white/40 hover:text-white" title="Reply"><MessageCircle className="w-4 h-4" /></button>
+                      <button onClick={() => setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)} className="p-2 hover:bg-white/10 rounded-xl text-white/40 hover:text-white" title="React"><Smile className="w-4 h-4" /></button>
+                      <button onClick={() => togglePin(msg.id)} className={`p-2 rounded-xl ${isPinned ? 'text-accent-cyan bg-accent-cyan/10' : 'text-white/40 hover:text-white'}`} title="Pin"><Pin className="w-4 h-4" /></button>
                       {isMe && (
                         <>
-                          <button onClick={() => startEdit(msg)} className="p-1.5 rounded-lg hover:bg-white/10 transition-all"><Edit3 className="w-3.5 h-3.5 text-white/50" /></button>
-                          <button onClick={() => deleteMessage(msg.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 transition-all"><Trash2 className="w-3.5 h-3.5 text-white/50 hover:text-red-400" /></button>
+                          <button onClick={() => { setEditingId(msg.id); setEditContent(msg.content || ''); }} className="p-2 hover:bg-white/10 rounded-xl text-white/40 hover:text-white" title="Edit"><Edit3 className="w-4 h-4" /></button>
+                          <button onClick={() => deleteMessage(msg.id)} className="p-2 hover:bg-red-500/10 rounded-xl text-white/40 hover:text-red-400" title="Delete"><Trash2 className="w-4 h-4" /></button>
                         </>
                       )}
                     </div>
+
+                    {showEmojiPicker === msg.id && (
+                      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`absolute bottom-full mb-3 ${isMe ? 'right-0' : 'left-0'} z-50 bg-surface-secondary border border-white/10 p-2 rounded-2xl flex gap-1 shadow-2xl`}>
+                        {EMOJI_OPTIONS.map(emoji => (
+                          <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)} className="w-9 h-9 flex items-center justify-center hover:bg-white/10 rounded-xl transition-colors text-xl">{emoji}</button>
+                        ))}
+                      </motion.div>
+                    )}
                   </div>
 
-                  {/* Reactions */}
-                  {msg.reactions && msg.reactions.length > 0 && (
-                    <div className={`flex flex-wrap gap-1.5 mt-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                      {Array.from(new Set(msg.reactions.map(r => r.emoji))).map(emoji => {
-                        const count = msg.reactions!.filter(r => r.emoji === emoji).length;
-                        const hasReacted = msg.reactions!.some(r => r.emoji === emoji && r.user_id === currentUser.id);
-                        return (
-                          <button
-                            key={emoji}
-                            onClick={() => toggleReaction(msg.id, emoji)}
-                            className={`px-2 py-1 rounded-full text-xs transition-all ${
-                              hasReacted ? 'bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30' : 'bg-white/5 text-white/60 hover:bg-white/10'
-                            }`}
-                          >
-                            {emoji} {count}
-                          </button>
-                        );
-                      })}
+                  {reactions.length > 0 && (
+                    <div className={`flex flex-wrap gap-1 mt-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      {reactions.map(r => (
+                        <button key={r.emoji} onClick={() => toggleReaction(msg.id, r.emoji)} className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${r.me ? 'bg-accent-cyan/20 border-accent-cyan text-accent-cyan' : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'}`}>
+                          <span>{r.emoji}</span>
+                          <span>{r.count}</span>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -583,76 +416,61 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Contexts */}
-      <AnimatePresence>
-        {(replyTo || selectedFile) && (
-          <motion.div
-            initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
-            className="px-4 py-3 border-t border-white/5 bg-surface-secondary flex items-center gap-4"
-          >
-            <div className="flex-1 min-w-0 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center">
-                {replyTo ? <MessageCircle className="w-4 h-4" /> : <Paperclip className="w-4 h-4" />}
+      {/* Input Area */}
+      <div className="p-4 border-t border-white/5 bg-surface-primary/50 backdrop-blur-md">
+        <AnimatePresence>
+          {(replyTo || selectedFile) && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-3 bg-white/5 rounded-2xl p-3 flex items-start justify-between border-l-4 border-accent-cyan">
+              <div className="flex gap-3">
+                {replyTo ? <MessageCircle className="w-4 h-4 text-accent-cyan mt-1" /> : <Paperclip className="w-4 h-4 text-accent-cyan mt-1" />}
+                <div>
+                  <p className="text-[10px] font-bold text-accent-cyan uppercase tracking-widest mb-1">{replyTo ? `Replying to ${replyTo.profiles?.username}` : 'File Attached'}</p>
+                  <p className="text-xs text-white/60 line-clamp-1">{replyTo ? replyTo.content : selectedFile?.name}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-xs text-white/40">
-                  {replyTo ? `Replying to ${replyTo.profiles?.username}` : 'File attached'}
-                </p>
-                <p className="text-sm font-medium truncate">{replyTo ? replyTo.content : selectedFile?.name}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => { setReplyTo(null); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-              className="p-2 rounded-lg hover:bg-white/10 transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <button onClick={() => { setReplyTo(null); setSelectedFile(null); }} className="p-1 hover:bg-white/10 rounded-lg"><X className="w-4 h-4 text-white/40" /></button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Message Input */}
-      <div className="p-4 border-t border-white/5">
         <form onSubmit={handleSend} className="flex gap-3 items-end">
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all disabled:opacity-50"
-            disabled={uploading}
-            aria-label="Attach"
-          >
-            <Paperclip className="w-5 h-5 text-white/60" />
-          </button>
-
-          <div className="flex-1 relative">
-            <label htmlFor="general-message-input" className="sr-only">Message</label>
-            <input
-              id="general-message-input"
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              className="input-glass"
-              disabled={uploading || !!editingId}
-            />
+          <input type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="hidden" />
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3.5 rounded-xl hover:bg-white/5 text-white/40 hover:text-white transition-all"><Paperclip className="w-5 h-5" /></button>
+          <div className="flex-1">
+            <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder={uploading ? "Broadcasting signal..." : "Type your message..."} className="input-glass !py-3.5 !rounded-2xl" disabled={uploading} />
           </div>
-
-          <button
-            type="submit"
-            disabled={(!newMessage.trim() && !selectedFile) || uploading || !!editingId}
-            aria-label="Send"
-            className="p-3 rounded-xl bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary font-medium hover:shadow-glow-cyan transition-all disabled:opacity-50"
-          >
-            {uploading ? (
-              <div className="w-5 h-5 border-2 border-surface-primary/30 border-t-surface-primary rounded-full animate-spin"></div>
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
+          <button type="submit" disabled={(!newMessage.trim() && !selectedFile) || uploading} className="p-3.5 rounded-xl bg-gradient-to-r from-accent-cyan to-accent-blue text-white font-bold shadow-lg shadow-accent-cyan/20 transition-all disabled:opacity-30">
+            {uploading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-5 h-5" />}
           </button>
         </form>
       </div>
+
+      {/* Pinned Side Panel Overlay */}
+      <AnimatePresence>
+        {showPinned && (
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="absolute right-0 top-0 bottom-0 w-80 bg-surface-secondary border-l border-white/5 z-50 shadow-2xl flex flex-col">
+            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">
+              <h3 className="font-bold text-sm uppercase tracking-widest text-white/60">Pinned Data</h3>
+              <button onClick={() => setShowPinned(false)} className="p-1 hover:bg-white/10 rounded-lg"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {pinnedList.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center opacity-20"><Pin className="w-12 h-12 mb-2" /><p className="text-xs uppercase font-bold">No Pins Found</p></div>
+              ) : (
+                pinnedList.map(msg => (
+                  <div key={msg.id} className="glass-card p-3 text-xs relative group/pin">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-bold text-accent-cyan">@{msg.profiles?.username}</span>
+                    </div>
+                    <p className="text-white/70 line-clamp-3">{msg.content}</p>
+                    <button onClick={() => togglePin(msg.id)} className="absolute top-2 right-2 text-red-400 opacity-0 group-hover/pin:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

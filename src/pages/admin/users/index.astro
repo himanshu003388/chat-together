@@ -1,44 +1,46 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
+import { AdminService } from '../../../services/admin.service';
+import { logger } from '../../../utils/logger';
 import { ChevronLeft } from 'lucide-react';
 
 const user = Astro.locals.user;
 const supabase = Astro.locals.supabase;
-
-// Extra check just in case, though middleware handles this
-const { data: profile } = await supabase
-  .from('profiles')
-  .select('role')
-  .eq('id', user?.id)
-  .maybeSingle();
+const profile = Astro.locals.profile;
 
 if (profile?.role !== 'admin') {
   return Astro.redirect('/');
 }
 
-// Handle actions (Ban/Unban/Delete)
+const adminService = new AdminService(supabase);
+let errorMessage = '';
+
+// Handle actions (Ban/Unban/Elevate)
 if (Astro.request.method === 'POST') {
+  try {
     const formData = await Astro.request.formData();
     const targetUserId = formData.get('userId')?.toString();
     const action = formData.get('action')?.toString();
 
     if (targetUserId && action) {
-        if (action === 'ban') {
-            await supabase.from('profiles').update({ is_banned: true }).eq('id', targetUserId);
-        } else if (action === 'unban') {
-            await supabase.from('profiles').update({ is_banned: false }).eq('id', targetUserId);
-        } else if (action === 'make_admin') {
-            await supabase.from('profiles').update({ role: 'admin' }).eq('id', targetUserId);
-        }
+      if (action === 'ban') {
+        await adminService.toggleBan(targetUserId, true);
+      } else if (action === 'unban') {
+        await adminService.toggleBan(targetUserId, false);
+      } else if (action === 'make_admin') {
+        const { error } = await supabase.from('profiles').update({ role: 'admin' }).eq('id', targetUserId);
+        if (error) throw error;
+        logger.info({ targetUserId }, 'User elevated to admin');
+      }
     }
+  } catch (err: any) {
+    logger.error(err, 'Admin action failed');
+    errorMessage = err.message;
+  }
 }
 
 // Fetch all users
-const { data: allUsers } = await supabase
-  .from('profiles')
-  .select('*')
-  .order('created_at', { ascending: false });
-
+const allUsers = await adminService.getAllUsers();
 ---
 
 <Layout title="Node Management">
@@ -53,6 +55,12 @@ const { data: allUsers } = await supabase
           Protocol Dashboard
       </a>
     </div>
+
+    {errorMessage && (
+      <div class="bg-red-500 text-white p-4 elite-border shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] mb-8 font-mono text-[10px] font-black uppercase tracking-widest">
+        Error: {errorMessage}
+      </div>
+    )}
 
     <div class="bg-white elite-border overflow-hidden shadow-[24px_24px_0px_0px_rgba(0,0,0,0.03)]">
       <div class="overflow-x-auto">
@@ -70,9 +78,9 @@ const { data: allUsers } = await supabase
               <tr class="hover:bg-elite-neutral-50 transition-colors">
                 <td class="px-8 py-6 whitespace-nowrap">
                   <div class="flex items-center">
-                    <div class="flex-shrink-0 h-10 w-10 elite-border bg-elite-black text-white flex items-center justify-center font-black text-xs">
+                    <div class="flex-shrink-0 h-10 w-10 elite-border bg-elite-black text-white flex items-center justify-center font-black text-xs overflow-hidden">
                       {u.avatar_url ? (
-                          <img class="h-full w-full object-cover" src={u.avatar_url} alt="" />
+                          <img class="h-full w-full object-cover" src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${u.avatar_url}`} alt="" />
                       ) : (
                           u.username.charAt(0).toUpperCase()
                       )}
@@ -84,7 +92,7 @@ const { data: allUsers } = await supabase
                   </div>
                 </td>
                 <td class="px-8 py-6 whitespace-nowrap">
-                  <span class={`elite-border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${u.role === 'admin' ? 'bg-elite-black text-white shadow-[4px_4px_0px_0px_rgba(255,255,255,0.1)]' : 'bg-white text-elite-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'}`}>
+                  <span class={`elite-border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${u.role === 'admin' ? 'bg-elite-black text-white' : 'bg-white text-elite-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'}`}>
                     {u.role}
                   </span>
                 </td>

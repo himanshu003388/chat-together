@@ -104,7 +104,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
-  admin_email TEXT := 'myadmin@email.com';
+  admin_email TEXT := 'himanshu003388@gmail.com';
 BEGIN
   INSERT INTO public.profiles (id, username, email, role)
   VALUES (
