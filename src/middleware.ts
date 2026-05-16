@@ -92,8 +92,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
         }
       }
 
-      // Admin route protection - check if user is admin, if not redirect
-      if (url.pathname.startsWith("/admin") && profile?.role !== 'admin') {
+      // Admin route protection - check if user is admin by email
+      const ADMIN_EMAIL = 'himanshu003388@gmail.com';
+      const isAdminEmail = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+      if (url.pathname.startsWith("/admin") && !isAdminEmail) {
         return context.redirect("/");
       }
     } catch (err) {
