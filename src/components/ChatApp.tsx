@@ -225,8 +225,8 @@ export default function ChatApp({
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div className="flex-1 flex flex-col relative">
+      {/* Chat Area - full width on mobile, flex-1 on desktop */}
+      <div className={`flex-1 flex flex-col relative ${activeUserId ? 'w-full md:w-auto' : 'w-full'}`}>
         {activeUserId && activeUserProfile ? (
           <>
             <div className="p-4 border-b border-white/5 glass flex items-center justify-between">
