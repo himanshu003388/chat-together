@@ -66,6 +66,8 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<string>('connecting');
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [showUserProfile, setShowUserProfile] = useState<any | null>(null);
+  const [allProfiles, setAllProfiles] = useState<any[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +78,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   useEffect(() => {
     fetchMessages();
     fetchPinnedMessages();
+    fetchAllProfiles();
 
     const messagesChannel = supabase
       .channel('general-messages')
@@ -177,6 +180,20 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   const fetchPinnedMessages = async () => {
     const { data } = await supabase.from('pinned_messages').select('message_id');
     if (data) setPinnedMessages(data.map(p => p.message_id));
+  };
+
+  const fetchAllProfiles = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url, bio, created_at, last_seen')
+      .neq('id', currentUser.id)
+      .order('last_seen', { ascending: false });
+    if (data) setAllProfiles(data);
+  };
+
+  const isOnline = (lastSeen: string | null) => {
+    if (!lastSeen) return false;
+    return (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
   };
 
   const scrollToBottom = () => {
@@ -296,12 +313,47 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
   const displayMessages = filteredMessages || messages;
   const pinnedList = messages.filter(m => pinnedMessages.includes(m.id));
 
+  const [showUsersList, setShowUsersList] = useState(false);
+
   return (
-    <div className="flex flex-col h-full bg-surface-primary overflow-hidden relative">
+    <div className="flex h-full bg-surface-primary overflow-hidden relative">
+      {/* Users Sidebar */}
+      <div className={cn(
+        "w-72 border-r border-white/5 flex flex-col transition-all duration-300 absolute md:relative z-20 h-full bg-surface-secondary",
+        showUsersList ? "translate-x-0" : "-translate-x-full md:translate-x-0 md:hidden"
+      )}>
+        <div className="p-4 border-b border-white/5">
+          <h3 className="text-lg font-bold uppercase italic tracking-tight">Nodes</h3>
+          <p className="text-xs text-white/40 font-mono mt-1">{allProfiles.length} users</p>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {allProfiles.map(profile => (
+            <button
+              key={profile.id}
+              onClick={() => setShowUserProfile(profile)}
+              className="w-full p-4 flex items-center gap-3 hover:bg-white/5 border-b border-white/5 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center font-bold text-surface-primary">
+                {profile.username?.[0].toUpperCase()}
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-bold text-sm">{profile.username}</p>
+                <p className="text-xs text-white/40 capitalize">{profile.bio || 'No bio'}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="p-4 sm:p-6 glass-dark border-b border-white/5 relative z-10 bg-black/40">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-5">
+            <button onClick={() => setShowUsersList(!showUsersList)} className="md:hidden p-2 hover:bg-white/10 rounded-lg">
+              <MessageCircle className="w-6 h-6 text-accent-cyan" />
+            </button>
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent-cyan via-accent-blue to-accent-purple p-[1px] shadow-lg shadow-accent-cyan/20">
               <div className="w-full h-full rounded-2xl bg-surface-primary flex items-center justify-center">
                 <MessageCircle className="w-6 h-6 text-accent-cyan" />
@@ -315,7 +367,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
               <div className="flex items-center gap-2 mt-1">
                 <div className={cn("w-2 h-2 rounded-full", realtimeStatus === 'SUBSCRIBED' ? "bg-accent-emerald animate-pulse" : "bg-accent-pink")}></div>
                 <p className="text-[10px] text-white/40 font-mono uppercase tracking-[0.2em]">
-                  {onlineUsersCount} NODES CONNECTED 
+                  {onlineUsersCount} NODES CONNECTED
                   <span className={cn("ml-2 opacity-100", realtimeStatus === 'SUBSCRIBED' ? "text-accent-emerald" : "text-accent-pink")}>
                     [{realtimeStatus.toUpperCase()}]
                   </span>
@@ -585,6 +637,48 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
           </>
         )}
       </AnimatePresence>
+      </div>
+
+      {/* Profile Modal */}
+      {showUserProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowUserProfile(null)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md glass-dark border border-white/10 rounded-3xl p-8 shadow-2xl"
+          >
+            <button onClick={() => setShowUserProfile(null)} className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-xl transition-colors">
+              <X className="w-5 h-5 text-white/40" />
+            </button>
+
+            <div className="text-center">
+              <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center text-4xl font-bold text-surface-primary shadow-lg shadow-accent-cyan/30">
+                {showUserProfile.username?.[0].toUpperCase()}
+              </div>
+              <h3 className="text-2xl font-bold tracking-tighter uppercase italic mb-2">{showUserProfile.username}</h3>
+              <p className="text-white/50 text-sm mb-4">{showUserProfile.bio || 'No bio available'}</p>
+
+              <div className="flex items-center justify-center gap-2 mb-6">
+                <div className={cn("w-2 h-2 rounded-full", isOnline(showUserProfile.last_seen) ? "bg-accent-emerald animate-pulse" : "bg-white/20")}></div>
+                <span className="text-xs font-mono text-white/40 uppercase tracking-widest">
+                  {isOnline(showUserProfile.last_seen) ? 'ACTIVE NOW' : `LAST SEEN ${new Date(showUserProfile.last_seen).toLocaleDateString()}`}
+                </span>
+              </div>
+
+              <button
+                onClick={() => window.location.href = `/chat?user=${showUserProfile.id}`}
+                className="w-full py-4 bg-gradient-to-r from-accent-cyan to-accent-blue rounded-2xl font-bold uppercase tracking-widest text-sm text-surface-primary hover:shadow-lg hover:shadow-accent-cyan/30 transition-all"
+              >
+                <MessageCircle className="w-4 h-4 inline mr-2" />
+                Message Privately
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
