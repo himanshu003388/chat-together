@@ -344,6 +344,9 @@ export default function ChatApp({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input-glass text-sm pl-9 py-2.5"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
             />
           </div>
         </div>
@@ -519,6 +522,9 @@ export default function ChatApp({
                     placeholder="Type a message..."
                     className="input-glass"
                     disabled={sendingMessage}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
                   />
                 </div>
                 <button
