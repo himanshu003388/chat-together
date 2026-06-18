@@ -3,7 +3,17 @@ import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 
 export class AdminService {
-  constructor(private supabase: SupabaseClient) {}
+  constructor(
+    private supabase: SupabaseClient,
+    private adminSupabase: SupabaseClient | null,
+  ) {}
+
+  private requireAdminClient(): SupabaseClient {
+    if (!this.adminSupabase) {
+      throw new AppError('SUPABASE_SERVICE_ROLE_KEY must be configured for admin operations', 500);
+    }
+    return this.adminSupabase;
+  }
 
   async getStats() {
     try {
@@ -49,7 +59,8 @@ export class AdminService {
   }
 
   async toggleBan(userId: string, isBanned: boolean) {
-    const { error } = await this.supabase
+    const admin = this.requireAdminClient();
+    const { error } = await admin
       .from('profiles')
       .update({ is_banned: isBanned })
       .eq('id', userId);
@@ -63,7 +74,8 @@ export class AdminService {
   }
 
   async deleteUser(userId: string) {
-    const { error: profileError } = await this.supabase
+    const admin = this.requireAdminClient();
+    const { error: profileError } = await admin
       .from('profiles')
       .delete()
       .eq('id', userId);
@@ -73,7 +85,7 @@ export class AdminService {
       throw new AppError('Failed to delete user');
     }
 
-    const { error: authError } = await this.supabase.auth.admin.deleteUser(userId);
+    const { error: authError } = await admin.auth.admin.deleteUser(userId);
 
     if (authError) {
       logger.error({ userId, error: authError.message }, 'Failed to delete auth user');
@@ -113,7 +125,8 @@ export class AdminService {
   }
 
   async deleteMessage(messageId: string) {
-    const { error } = await this.supabase
+    const admin = this.requireAdminClient();
+    const { error } = await admin
       .from('messages')
       .delete()
       .eq('id', messageId);
@@ -142,7 +155,8 @@ export class AdminService {
   }
 
   async promoteToAdmin(userId: string) {
-    const { error } = await this.supabase
+    const admin = this.requireAdminClient();
+    const { error } = await admin
       .from('profiles')
       .update({ role: 'admin' })
       .eq('id', userId);
@@ -156,7 +170,8 @@ export class AdminService {
   }
 
   async demoteToUser(userId: string) {
-    const { error } = await this.supabase
+    const admin = this.requireAdminClient();
+    const { error } = await admin
       .from('profiles')
       .update({ role: 'user' })
       .eq('id', userId);

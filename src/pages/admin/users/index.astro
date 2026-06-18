@@ -1,22 +1,23 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import { AdminService } from '../../../services/admin.service';
+import { createAdminClient } from '../../../lib/supabase';
 import { logger } from '../../../utils/logger';
 import { ChevronLeft, Shield } from 'lucide-react';
 
 const user = Astro.locals.user;
-const supabase = Astro.locals.supabase;
 const profile = Astro.locals.profile;
 
 if (profile?.role !== 'admin') {
   return Astro.redirect('/');
 }
 
-const adminService = new AdminService(Astro.locals.supabase);
+const adminClient = createAdminClient();
+const adminService = new AdminService(Astro.locals.supabase, adminClient);
 let errorMessage = '';
 let successMessage = '';
 
-// Handle actions (Ban/Unban/Elevate/Demote/Delete)
+// Handle actions (Ban/Unban/Elevate/Demote/Delete) with redirect-after-POST
 if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
@@ -26,29 +27,32 @@ if (Astro.request.method === 'POST') {
     if (targetUserId && action) {
       if (action === 'ban') {
         await adminService.toggleBan(targetUserId, true);
-        successMessage = 'User terminated successfully';
+        return Astro.redirect('/admin/users?success=User+terminated');
       } else if (action === 'unban') {
         await adminService.toggleBan(targetUserId, false);
-        successMessage = 'User reinstated successfully';
+        return Astro.redirect('/admin/users?success=User+reinstated');
       } else if (action === 'make_admin') {
         await adminService.promoteToAdmin(targetUserId);
-        successMessage = 'User elevated to admin';
+        return Astro.redirect('/admin/users?success=User+elevated+to+admin');
       } else if (action === 'demote') {
         await adminService.demoteToUser(targetUserId);
-        successMessage = 'User demoted to user role';
+        return Astro.redirect('/admin/users?success=User+demoted');
       } else if (action === 'delete') {
         await adminService.deleteUser(targetUserId);
-        successMessage = 'User permanently deleted';
+        return Astro.redirect('/admin/users?success=User+deleted');
       }
     }
   } catch (err: any) {
     logger.error(err, 'Admin action failed');
-    errorMessage = err.message;
+    return Astro.redirect(`/admin/users?error=${encodeURIComponent(err.message)}`);
   }
 }
 
 // Fetch all users
 const allUsers = await adminService.getAllUsers();
+const url = new URL(Astro.request.url);
+successMessage = url.searchParams.get('success') || '';
+errorMessage = url.searchParams.get('error') || '';
 ---
 
 <Layout title="Node Registry">

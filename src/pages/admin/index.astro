@@ -1,6 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { AdminService } from '../../services/admin.service';
+import { createAdminClient } from '../../lib/supabase';
 import { Users, Hash, MessageCircle, Shield, AlertTriangle } from 'lucide-react';
 
 const profile = Astro.locals.profile;
@@ -8,7 +9,8 @@ if (profile?.role !== 'admin') {
   return Astro.redirect('/');
 }
 
-const adminService = new AdminService(Astro.locals.supabase);
+const adminClient = createAdminClient();
+const adminService = new AdminService(Astro.locals.supabase, adminClient);
 const { userCount, messageCount } = await adminService.getStats();
 const recentUsers = await adminService.getRecentUsers();
 const chatRooms = await adminService.getAllChatRooms();

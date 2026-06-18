@@ -1,6 +1,7 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import { AdminService } from '../../../services/admin.service';
+import { createAdminClient } from '../../../lib/supabase';
 import { logger } from '../../../utils/logger';
 import { ChevronLeft, MessageCircle, Trash2 } from 'lucide-react';
 
@@ -10,10 +11,11 @@ if (profile?.role !== 'admin') {
   return Astro.redirect('/');
 }
 
-const adminService = new AdminService(Astro.locals.supabase);
+const adminClient = createAdminClient();
+const adminService = new AdminService(Astro.locals.supabase, adminClient);
 let successMessage = '';
 
-// Handle delete message
+// Handle delete message with redirect-after-POST
 if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
@@ -22,14 +24,18 @@ if (Astro.request.method === 'POST') {
 
     if (messageId && action === 'delete') {
       await adminService.deleteMessage(messageId);
-      successMessage = 'Message deleted successfully';
+      return Astro.redirect('/admin/messages?success=Message+deleted');
     }
   } catch (err: any) {
     logger.error(err, 'Admin action failed');
+    return Astro.redirect(`/admin/messages?error=${encodeURIComponent(err.message)}`);
   }
 }
 
 const allMessages = await adminService.getAllMessages(100);
+const url = new URL(Astro.request.url);
+successMessage = url.searchParams.get('success') || '';
+const errorMessage = url.searchParams.get('error') || '';
 ---
 
 <Layout title="Message Logs">
@@ -47,6 +53,12 @@ const allMessages = await adminService.getAllMessages(100);
         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tighter uppercase italic">Transmission Logs</h1>
       </div>
     </div>
+
+    {errorMessage && (
+      <div class="glass-dark border-accent-pink/30 bg-accent-pink/10 p-4 rounded-2xl mb-6 flex items-center gap-3">
+        <span class="text-accent-pink text-sm font-bold uppercase">{errorMessage}</span>
+      </div>
+    )}
 
     {successMessage && (
       <div class="glass-dark border-accent-emerald/30 bg-accent-emerald/10 p-4 rounded-2xl mb-6 flex items-center gap-3">
@@ -91,11 +103,11 @@ const allMessages = await adminService.getAllMessages(100);
                   </span>
                 </div>
                 <p class="text-xs sm:text-sm text-white/70 line-clamp-2 sm:line-clamp-none">{m.content || '[File Attachment]'}</p>
-                {m.file_url && (
-                  <div class="mt-1 sm:mt-2 text-[8px] sm:text-[10px] text-white/40 font-mono truncate">
-                    📎 {m.file_name || 'Attachment'}
-                  </div>
-                )}
+                  {m.file_url && (
+                    <div class="mt-1 sm:mt-2 text-[8px] sm:text-[10px] text-white/40 font-mono truncate">
+                      {m.file_name || 'Attachment'}
+                    </div>
+                  )}
                 <span class="text-[8px] text-white/20 font-mono sm:hidden mt-1 block">
                   {new Date(m.created_at).toLocaleString()}
                 </span>

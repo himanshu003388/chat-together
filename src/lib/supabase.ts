@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 
 export const supabaseClient = (context: any) => {
   const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
@@ -41,4 +42,20 @@ export const supabaseClient = (context: any) => {
       },
     }
   );
+};
+
+export const createAdminClient = () => {
+  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 };
