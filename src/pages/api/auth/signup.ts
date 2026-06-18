@@ -4,7 +4,7 @@ import { AuthService } from "../../../services/auth.service";
 import { logger } from "../../../utils/logger";
 import { AppError } from "../../../utils/errors";
 
-export const POST: APIRoute = async ({ request, locals, redirect }) => {
+export const POST: APIRoute = async ({ request, locals, cookies, redirect }) => {
   try {
     const formData = await request.formData();
     const email = formData.get("email")?.toString();
@@ -25,15 +25,17 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
     // If session was returned, user is auto-logged in
     if (data.session) {
+      cookies.set('_login_check', '1', { path: '/', maxAge: 60, httpOnly: true });
       logger.info({ email: validated.data.email }, "User signed up and logged in");
-      return redirect("/");
+      return redirect("/chat");
     }
 
     // If no session, try signing in immediately (works if auto-confirm is enabled)
     try {
       await authService.signIn(validated.data.email, validated.data.password);
+      cookies.set('_login_check', '1', { path: '/', maxAge: 60, httpOnly: true });
       logger.info({ email: validated.data.email }, "User signed up and logged in");
-      return redirect("/");
+      return redirect("/chat");
     } catch {
       // Email confirmation required — tell user
       return redirect(`/login?message=Please check your email to confirm your account&email=${encodeURIComponent(validated.data.email)}`);
