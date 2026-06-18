@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseBrowser';
+import { ChatService } from '../services/chat.service';
 import { Users, Plus, Hash, ChevronRight, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -27,22 +28,23 @@ export default function ChatRooms({ currentUser }: ChatRoomsProps) {
   const [newRoomDesc, setNewRoomDesc] = useState('');
   const [loading, setLoading] = useState(true);
 
+  const chatService = useMemo(() => new ChatService(supabase), []);
+
   useEffect(() => {
     fetchRooms();
   }, []);
 
   const fetchRooms = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('chat_rooms')
-      .select('*, members:chat_room_members(count)');
-
-    if (data) {
-      const roomsWithCount = data.map(room => ({
+    try {
+      const data = await chatService.getRooms();
+      const roomsWithCount = (data || []).map(room => ({
         ...room,
-        member_count: room.members?.[0]?.count ?? 0
+        member_count: (room as any).chat_room_members?.[0]?.count ?? 0
       }));
       setRooms(roomsWithCount);
+    } catch (err) {
+      console.error('Failed to fetch rooms:', err);
     }
     setLoading(false);
   };
@@ -51,26 +53,14 @@ export default function ChatRooms({ currentUser }: ChatRoomsProps) {
     e.preventDefault();
     if (!newRoomName.trim()) return;
 
-    const { data, error } = await supabase
-      .from('chat_rooms')
-      .insert({
-        name: newRoomName,
-        description: newRoomDesc,
-        created_by: currentUser.id
-      })
-      .select()
-      .single();
-
-    if (data) {
-      await supabase.from('chat_room_members').insert({
-        room_id: data.id,
-        user_id: currentUser.id
-      });
-
+    try {
+      await chatService.createRoom(newRoomName.trim(), false, currentUser.id);
       setShowCreateModal(false);
       setNewRoomName('');
       setNewRoomDesc('');
       fetchRooms();
+    } catch (err) {
+      console.error('Failed to create room:', err);
     }
   };
 

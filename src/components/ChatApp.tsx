@@ -4,12 +4,7 @@ import { ChatService } from '../services/chat.service';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Send, MoreVertical, Check, CheckCheck, Phone, Video, Paperclip, X, FileText, ChevronLeft, MessageCircle, Zap, Shield, Cpu } from 'lucide-react';
 import TiltCard from './TiltCard';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from '../utils/cn';
 
 interface Profile {
   id: string;

@@ -21,7 +21,7 @@ if (Astro.request.method === 'POST') {
     const formData = await Astro.request.formData();
     const username = formData.get('username')?.toString();
     const bio = formData.get('bio')?.toString();
-    const avatarFile = formData.get('avatar') as File;
+    const avatarFile = formData.get('avatar');
 
     // 1. Validation
     const validated = profileSchema.safeParse({ username, bio });
@@ -32,8 +32,11 @@ if (Astro.request.method === 'POST') {
     let avatar_url = profile?.avatar_url;
 
     // 2. Handle File Upload
-    if (avatarFile && avatarFile.size > 0) {
-      avatar_url = await profileService.uploadAvatar(user.id, avatarFile);
+    if (avatarFile && typeof avatarFile === 'object' && 'size' in avatarFile && (avatarFile as File).size > 0) {
+      if ((avatarFile as File).size > 2 * 1024 * 1024) {
+        throw new Error('File size must be under 2MB');
+      }
+      avatar_url = await profileService.uploadAvatar(user.id, avatarFile as File);
     }
 
     // 3. Update Profile

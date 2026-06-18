@@ -6,12 +6,7 @@ import {
   Send, Paperclip, MoreVertical, Hash, ChevronLeft, Smile, Reply as ReplyIcon,
   X, CornerDownRight, Pin, File as FileIcon, Download, Zap, Trash2
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from '../utils/cn';
 
 interface Profile {
   id: string;
@@ -261,9 +256,9 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
         const messagesWithReplies = (data as any[]).map(msg => {
           if (msg.reply_to) {
             const parent = data.find((m: any) => m.id === msg.reply_to) || replyMap[msg.reply_to];
-            if (parent) {
-              msg.reply_message = { content: parent.content, profiles: parent.profiles };
-            }
+            msg.reply_message = parent
+              ? { content: parent.content, profiles: parent.profiles }
+              : { content: '[deleted]', profiles: null };
           }
           return msg;
         });
@@ -358,7 +353,10 @@ export default function RoomChat({ roomId, roomName, currentUser }: RoomChatProp
 
     setUploading(true);
     try {
-      await chatService.uploadAttachment(roomId, currentUser.id, file);
+      const sent = await chatService.uploadAttachment(roomId, currentUser.id, file);
+      if (sent) {
+        setMessages(prev => [...prev, { ...sent, reactions: [], reply_message: null } as any]);
+      }
     } catch (err) {
       alert('File upload failed');
     } finally {

@@ -124,11 +124,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Deny all iframes except same-origin
   response.headers.set('Content-Security-Policy', "frame-ancestors 'self';");
 
-  // Cache publicly-renderable pages at CDN edge for 60s
-  if (response.status === 200 && !url.pathname.startsWith('/admin') && !url.pathname.startsWith('/chat')) {
+  // Only cache the landing page publicly — never auth-adjacent or user-specific pages
+  const isPublicPage = url.pathname === '/' || url.pathname === '/login' || url.pathname === '/signup';
+  if (response.status === 200 && isPublicPage) {
     response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
   } else {
-    // Never cache auth-adjacent pages
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   }
   

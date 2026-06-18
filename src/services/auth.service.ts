@@ -34,7 +34,7 @@ export class AuthService {
   }
 
   async signUp(email: string, password: string, username: string) {
-    // Check if username exists
+    // Check if username exists (best-effort — DB constraint is the source of truth)
     const { data: existingUser } = await this.supabase
       .from('profiles')
       .select('username')
@@ -72,7 +72,14 @@ export class AuthService {
           role,
         }, { onConflict: 'id' });
       } catch (err) {
-        logger.error({ userId: data.user.id, err }, 'Profile creation fallback failed (non-fatal)');
+        // Profile creation failed — delete the auth user to prevent orphans
+        logger.error({ userId: data.user.id, err }, 'Profile creation failed, cleaning up auth user');
+        try {
+          await this.supabase.auth.admin.deleteUser(data.user.id);
+        } catch (cleanupErr) {
+          logger.error({ userId: data.user.id, err: cleanupErr }, 'Failed to clean up orphaned auth user');
+        }
+        throw new AppError('Failed to create account. Please try again.', 500);
       }
     }
 

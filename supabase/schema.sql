@@ -106,9 +106,18 @@ CREATE POLICY "Users can update own profile." ON public.profiles FOR UPDATE USIN
 DROP POLICY IF EXISTS "Users can update own last_seen." ON public.profiles;
 CREATE POLICY "Users can update own last_seen." ON public.profiles FOR UPDATE USING ( auth.uid() = id ) WITH CHECK ( auth.uid() = id );
 
+DROP POLICY IF EXISTS "Users can delete own profile." ON public.profiles;
+CREATE POLICY "Users can delete own profile." ON public.profiles FOR DELETE USING ( auth.uid() = id );
+
 -- Messages Policies
 DROP POLICY IF EXISTS "Anyone can view messages." ON public.messages;
-CREATE POLICY "Anyone can view messages." ON public.messages FOR SELECT USING ( true );
+CREATE POLICY "Users can view their messages." ON public.messages FOR SELECT USING (
+  auth.uid() = sender_id OR
+  auth.uid() = receiver_id OR
+  (chat_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.chat_room_members WHERE room_id = messages.chat_id AND user_id = auth.uid()
+  ))
+);
 
 DROP POLICY IF EXISTS "Authenticated users can insert messages." ON public.messages;
 CREATE POLICY "Authenticated users can insert messages." ON public.messages FOR INSERT WITH CHECK ( auth.role() = 'authenticated' );
@@ -148,6 +157,12 @@ CREATE POLICY "Chat rooms are viewable by everyone." ON public.chat_rooms FOR SE
 
 DROP POLICY IF EXISTS "Authenticated users can create chat rooms." ON public.chat_rooms;
 CREATE POLICY "Authenticated users can create chat rooms." ON public.chat_rooms FOR INSERT WITH CHECK ( auth.uid() = created_by );
+
+DROP POLICY IF EXISTS "Creators can update their chat rooms." ON public.chat_rooms;
+CREATE POLICY "Creators can update their chat rooms." ON public.chat_rooms FOR UPDATE USING ( auth.uid() = created_by );
+
+DROP POLICY IF EXISTS "Creators can delete their chat rooms." ON public.chat_rooms;
+CREATE POLICY "Creators can delete their chat rooms." ON public.chat_rooms FOR DELETE USING ( auth.uid() = created_by );
 
 -- Chat room members Policies
 DROP POLICY IF EXISTS "Room members can view their rooms." ON public.chat_room_members;

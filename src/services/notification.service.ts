@@ -1,7 +1,8 @@
 import { Resend } from 'resend';
 import { logger } from '../utils/logger';
 
-const resend = new Resend(import.meta.env.RESEND_API_KEY || 're_placeholder');
+const apiKey = import.meta.env.RESEND_API_KEY;
+const resend = apiKey ? new Resend(apiKey) : null;
 
 interface EmailPayload {
   to: string[];
@@ -24,6 +25,7 @@ export class NotificationService {
     siteUrl: string;
   }): Promise<void> {
     const { recipientEmail, recipientName, senderUsername, messageContent, siteUrl } = params;
+    if (!resend) return;
     try {
       const payload: EmailPayload = {
         to: [recipientEmail],
@@ -63,6 +65,7 @@ export class NotificationService {
     roomName?: string;
   }): Promise<void> {
     const { recipientEmail, recipientName, mentionedByUsername, messageContent, siteUrl, chatType, roomName } = params;
+    if (!resend) return;
     try {
       const channelLabel = chatType === 'room' ? `#${roomName || 'room'}` : 'General Hall';
       const linkUrl = chatType === 'room' ? `${siteUrl}/chat/rooms` : `${siteUrl}/`;

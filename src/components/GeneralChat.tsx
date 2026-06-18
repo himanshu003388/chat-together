@@ -6,12 +6,7 @@ import {
   Send, Paperclip, FileText, X, Download,
   MessageCircle, Pin, Trash2, Edit3, Search, Smile, Shield
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from '../utils/cn';
 
 interface Profile {
   id: string;
@@ -303,8 +298,7 @@ export default function GeneralChat({ currentUser }: GeneralChatProps) {
         setMessages(prev => {
           const exists = prev.find(m => m.id === sent.id);
           if (exists) return prev;
-          const filtered = prev.filter(m => !(m.id.startsWith('temp-') && m.sender_id === currentUser.id && m.content === sent.content));
-          return [...filtered, { ...sent, reactions: [] }];
+          return [...prev, { ...sent, reactions: [] }];
         });
 
         // Parse @mentions and send email notifications
