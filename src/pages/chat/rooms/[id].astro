@@ -1,0 +1,40 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import RoomChat from '../../../components/RoomChat';
+import { ChatService } from '../../../services/chat.service';
+import { logger } from '../../../utils/logger';
+
+const { id } = Astro.params;
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+const supabase = Astro.locals.supabase;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+let room;
+try {
+  const chatService = new ChatService(supabase);
+  room = await chatService.getRoomById(id!, user.id);
+} catch (err: any) {
+  logger.warn({ roomId: id, userId: user.id, error: err.message }, 'Failed to access room');
+  return Astro.redirect('/chat/rooms?error=' + encodeURIComponent(err.message));
+}
+---
+
+<Layout title={`${room.name.toUpperCase()} — NODE`}>
+  <div class="flex-1 h-[calc(100vh-80px)] overflow-hidden">
+    <div class="h-full">
+      <RoomChat 
+        client:load 
+        roomId={id!} 
+        roomName={room.name}
+        currentUser={{ 
+          id: user.id, 
+          username: profile?.username 
+        }} 
+      />
+    </div>
+  </div>
+</Layout>

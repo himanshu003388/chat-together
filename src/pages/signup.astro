@@ -1,0 +1,85 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const user = Astro.locals.user;
+if (user) {
+  return Astro.redirect('/');
+}
+
+const error = Astro.url.searchParams.get('error');
+---
+
+<Layout title="Create Account">
+  <div class="min-h-full flex items-center justify-center py-12 px-6 relative">
+    {/* Background Effects */}
+    <div class="fixed inset-0 pointer-events-none overflow-hidden">
+      <div class="absolute top-0 -right-40 w-[400px] h-[400px] bg-accent-purple/10 rounded-full blur-[120px]" />
+      <div class="absolute bottom-0 -left-40 w-[400px] h-[400px] bg-accent-pink/8 rounded-full blur-[120px]" />
+      <div class="absolute inset-0 opacity-[0.02]" style="background-image: linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px); background-size: 60px 60px;" />
+    </div>
+
+    <div class="w-full max-w-md relative z-10">
+      {/* Brand Link */}
+      <a href="/" class="flex items-center gap-2 mb-8 justify-center group">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center group-hover:scale-110 transition-transform">
+          <span class="text-surface-primary font-black text-xs">C</span>
+        </div>
+        <span class="text-sm font-bold tracking-tight uppercase italic">ChatTogether</span>
+      </a>
+
+      <div class="glass-card p-8 sm:p-10 border-white/[0.04]">
+        <div class="text-center mb-8">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center mx-auto mb-5 shadow-lg shadow-accent-purple/20">
+            <svg class="w-7 h-7 text-surface-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0H9m9-5a3 3 0 11-6 0 3 3 0 016 0zm6 3v2m0-3v2m0-3v2m-6 3h12a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2m12 3V9m0 0h3m-3 0h-3" />
+            </svg>
+          </div>
+          <h2 class="text-2xl font-bold tracking-tight uppercase italic">Create Account</h2>
+          <p class="mt-2 text-white/40 text-sm font-mono">Join the community</p>
+        </div>
+
+        {error && (
+          <div class="bg-red-500/10 border border-red-500/20 p-4 rounded-xl mb-6">
+            <p class="text-red-400 text-sm font-medium">{error}</p>
+          </div>
+        )}
+
+        <form action="/api/auth/signup" method="post" class="space-y-5">
+          <div class="space-y-4">
+            <div>
+              <label for="username" class="text-xs font-bold text-white/50 uppercase tracking-widest mb-2 block">Username</label>
+              <input id="username" name="username" type="text" autocomplete="username" required minlength="3" maxlength="30" pattern="[a-zA-Z0-9_]+"
+                class="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-accent-purple/40 focus:bg-accent-purple/[0.02] transition-all placeholder:text-white/15"
+                placeholder="your_username" />
+              <p class="text-[10px] text-white/25 mt-1.5 font-mono">Letters, numbers, and underscores only</p>
+            </div>
+            <div>
+              <label for="email" class="text-xs font-bold text-white/50 uppercase tracking-widest mb-2 block">Email</label>
+              <input id="email" name="email" type="email" autocomplete="email" required
+                class="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-accent-purple/40 focus:bg-accent-purple/[0.02] transition-all placeholder:text-white/15"
+                placeholder="you@example.com" />
+            </div>
+            <div>
+              <label for="password" class="text-xs font-bold text-white/50 uppercase tracking-widest mb-2 block">Password</label>
+              <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8"
+                class="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-accent-purple/40 focus:bg-accent-purple/[0.02] transition-all placeholder:text-white/15"
+                placeholder="Minimum 8 characters" />
+            </div>
+          </div>
+
+          <button type="submit"
+            class="w-full py-3.5 rounded-xl bg-gradient-to-r from-accent-purple to-accent-pink text-white font-bold text-sm uppercase tracking-wider shadow-lg shadow-accent-purple/15 hover:shadow-accent-purple/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200">
+            Create Account
+          </button>
+        </form>
+
+        <div class="mt-8 pt-6 border-t border-white/[0.04] text-center">
+          <p class="text-sm text-white/40">
+            Already have an account?{' '}
+            <a href="/login" class="text-accent-cyan hover:underline font-medium">Sign in</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,96 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const user = Astro.locals.user;
+if (user) {
+  return Astro.redirect('/');
+}
+
+const error = Astro.url.searchParams.get('error');
+const message = Astro.url.searchParams.get('message');
+const emailParam = Astro.url.searchParams.get('email') || '';
+---
+
+<Layout title="Sign In">
+  <div class="min-h-full flex items-center justify-center py-12 px-6 relative">
+    {/* Background Effects */}
+    <div class="fixed inset-0 pointer-events-none overflow-hidden">
+      <div class="absolute top-0 -left-40 w-[400px] h-[400px] bg-accent-cyan/10 rounded-full blur-[120px]" />
+      <div class="absolute bottom-0 -right-40 w-[400px] h-[400px] bg-accent-purple/8 rounded-full blur-[120px]" />
+      <div class="absolute inset-0 opacity-[0.02]" style="background-image: linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px); background-size: 60px 60px;" />
+    </div>
+
+    <div class="w-full max-w-md relative z-10">
+      {/* Brand Link */}
+      <a href="/" class="flex items-center gap-2 mb-8 justify-center group">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center group-hover:scale-110 transition-transform">
+          <span class="text-surface-primary font-black text-xs">C</span>
+        </div>
+        <span class="text-sm font-bold tracking-tight uppercase italic">ChatTogether</span>
+      </a>
+
+      <div class="glass-card p-8 sm:p-10 border-white/[0.04]">
+        <div class="text-center mb-8">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center mx-auto mb-5 shadow-lg shadow-accent-cyan/20">
+            <svg class="w-7 h-7 text-surface-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+            </svg>
+          </div>
+          <h2 class="text-2xl font-bold tracking-tight uppercase italic">Welcome Back</h2>
+          <p class="mt-2 text-white/40 text-sm font-mono">Sign in to your account</p>
+        </div>
+
+        {error && (
+          <div class="bg-red-500/10 border border-red-500/20 p-4 rounded-xl mb-6">
+            <p class="text-red-400 text-sm font-medium">{error}</p>
+          </div>
+        )}
+        {message && (
+          <div class="bg-accent-cyan/10 border border-accent-cyan/20 p-4 rounded-xl mb-6">
+            <p class="text-accent-cyan text-sm font-medium">{message}</p>
+          </div>
+        )}
+        {(error?.toLowerCase().includes('confirm') || message?.toLowerCase().includes('confirm')) && emailParam && (
+          <form action="/api/auth/resend" method="post" class="mb-6">
+            <input type="hidden" name="email" value={emailParam} />
+            <p class="text-sm text-white/50 text-center">
+              Didn't receive the email?{' '}
+              <button type="submit" class="text-accent-cyan hover:underline font-medium">Resend</button>
+            </p>
+          </form>
+        )}
+
+        <form action="/api/auth/signin" method="post" class="space-y-5">
+          <div class="space-y-4">
+            <div>
+              <label for="email" class="text-xs font-bold text-white/50 uppercase tracking-widest mb-2 block">Email</label>
+              <input id="email" name="email" type="email" autocomplete="email" required
+                class="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-accent-cyan/40 focus:bg-accent-cyan/[0.02] transition-all placeholder:text-white/15"
+                placeholder="you@example.com" />
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label for="password" class="text-xs font-bold text-white/50 uppercase tracking-widest">Password</label>
+              </div>
+              <input id="password" name="password" type="password" autocomplete="current-password" required
+                class="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-accent-cyan/40 focus:bg-accent-cyan/[0.02] transition-all placeholder:text-white/15"
+                placeholder="Enter your password" />
+            </div>
+          </div>
+
+          <button type="submit"
+            class="w-full py-3.5 rounded-xl bg-gradient-to-r from-accent-cyan to-accent-blue text-surface-primary font-bold text-sm uppercase tracking-wider shadow-lg shadow-accent-cyan/15 hover:shadow-accent-cyan/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200">
+            Sign In
+          </button>
+        </form>
+
+        <div class="mt-8 pt-6 border-t border-white/[0.04] text-center">
+          <p class="text-sm text-white/40">
+            Don't have an account?{' '}
+            <a href="/signup" class="text-accent-cyan hover:underline font-medium">Create one</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

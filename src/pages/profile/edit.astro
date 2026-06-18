@@ -1,0 +1,113 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { ProfileService } from '../../services/profile.service';
+import { profileSchema } from '../../utils/validation';
+import { logger } from '../../utils/logger';
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profileService = new ProfileService(supabase);
+let profile = await profileService.getProfile(user.id);
+
+let errorMessage = '';
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const username = formData.get('username')?.toString();
+    const bio = formData.get('bio')?.toString();
+    const avatarFile = formData.get('avatar') as File;
+
+    // 1. Validation
+    const validated = profileSchema.safeParse({ username, bio });
+    if (!validated.success) {
+      throw new Error(validated.error.issues[0].message);
+    }
+
+    let avatar_url = profile?.avatar_url;
+
+    // 2. Handle File Upload
+    if (avatarFile && avatarFile.size > 0) {
+      avatar_url = await profileService.uploadAvatar(user.id, avatarFile);
+    }
+
+    // 3. Update Profile
+    await profileService.updateProfile(user.id, {
+      username: validated.data.username,
+      bio: validated.data.bio,
+      avatar_url
+    });
+
+    logger.info({ userId: user.id }, 'Profile updated');
+    return Astro.redirect('/profile');
+  } catch (error: any) {
+    logger.warn({ userId: user.id, error: error.message }, 'Profile update failed');
+    errorMessage = error.message;
+  }
+}
+---
+
+<Layout title="Edit Profile">
+	<div class="max-w-2xl mx-auto py-8 sm:py-12 px-4 sm:px-6">
+		<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6 mb-6 sm:mb-10">
+			<div>
+				<p class="text-xs sm:text-sm text-white/40 font-mono mb-1 sm:mb-2">Update your profile</p>
+				<h1 class="text-3xl sm:text-4xl font-bold">Edit Profile</h1>
+			</div>
+			<a href="/profile" class="btn-ghost text-sm w-full sm:w-auto text-center">
+				Cancel
+			</a>
+		</div>
+
+		{errorMessage && (
+			<div class="glass border-red-500/30 p-3 sm:p-4 rounded-lg mb-4 sm:mb-6">
+				<p class="text-red-400 text-xs sm:text-sm">{errorMessage}</p>
+			</div>
+		)}
+
+		<form method="post" enctype="multipart/form-data" class="glass-card p-6 sm:p-8 space-y-6 sm:space-y-8">
+			<div class="space-y-3 sm:space-y-4">
+				<label class="text-xs sm:text-sm font-medium text-white/70">Profile Photo</label>
+				<div class="flex items-center gap-4 sm:gap-6">
+					<div class="h-16 w-16 sm:h-20 sm:w-20 rounded-xl overflow-hidden bg-surface-tertiary flex items-center justify-center shrink-0">
+						{profile?.avatar_url ? (
+							<img src={`${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${profile.avatar_url}`} alt="" class="h-full w-full object-cover" />
+						) : (
+							<div class="w-full h-full bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center text-xl sm:text-2xl font-bold">
+								{profile?.username?.charAt(0).toUpperCase()}
+							</div>
+						)}
+					</div>
+					<div>
+						<input type="file" name="avatar" id="avatar-input" accept="image/*" class="hidden" />
+						<label for="avatar-input" class="btn-secondary text-xs sm:text-sm cursor-pointer inline-block">
+							Upload Photo
+						</label>
+						<p class="text-[10px] sm:text-xs text-white/40 mt-1 sm:mt-2">JPG, PNG, GIF • Max 2MB</p>
+					</div>
+				</div>
+			</div>
+
+			<div class="space-y-1.5 sm:space-y-2">
+				<label for="username" class="text-xs sm:text-sm font-medium text-white/70">Username</label>
+				<input type="text" name="username" id="username" value={profile?.username} required class="input-glass text-sm" />
+			</div>
+
+			<div class="space-y-1.5 sm:space-y-2">
+				<label for="bio" class="text-xs sm:text-sm font-medium text-white/70">Bio</label>
+				<textarea id="bio" name="bio" rows="3" class="input-glass resize-none text-sm" placeholder="Tell us about yourself...">{profile?.bio}</textarea>
+			</div>
+
+			<div class="pt-2 sm:pt-4">
+				<button type="submit" class="btn-primary w-full !py-3 sm:!py-3.5 text-sm sm:text-base">
+					Save Changes
+				</button>
+			</div>
+		</form>
+	</div>
+</Layout>
